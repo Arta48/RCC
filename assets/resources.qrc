@@ -1,0 +1,17 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource>
+        <file alias="icon.png">icon.png</file>
+        <!-- Аудиоресурсы -->
+        <file>audio/bg_jazz.mp3</file>
+        <file>audio/button_click.wav</file>
+        <file>audio/card_shuffle.wav</file>
+        <file>audio/card_place.wav</file>
+        <file>audio/chip_bet.wav</file>
+        <file>audio/check_tap.wav</file>
+        <file>audio/card_fold.wav</file>
+        <file>audio/win_chips.wav</file>
+        <file>audio/lose.wav</file>
+        <file>audio/bito.wav</file>
+    </qresource>
+</RCC>

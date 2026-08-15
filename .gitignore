@@ -1,0 +1,5 @@
+build/
+build-windows/
+build-macos/
+build-ios/
+.DS_Store
