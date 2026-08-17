@@ -9,6 +9,7 @@ fi
 if command -v brew &> /dev/null; then
     BREW_PREFIX=$(brew --prefix)
     export PATH="$BREW_PREFIX/opt/qt/bin:$BREW_PREFIX/opt/qt6/bin:$PATH"
+    export CMAKE_PREFIX_PATH="$BREW_PREFIX/opt/qt6:$BREW_PREFIX/opt/qt:$CMAKE_PREFIX_PATH"
 fi
 
 # 2. Очистка старой сборки

@@ -2,6 +2,8 @@
 #include <QSpinBox>
 #include <QCheckBox>
 #include <QTextBrowser>
+#include <QScrollArea>
+#include <QScroller>
 
 #include "AppSettings.h"
 #include "MainWindow.h"
@@ -15,88 +17,38 @@ class SettingsDialog : public QDialog {
 public:
     explicit SettingsDialog(QWidget* parent = nullptr) : QDialog(parent) {
         setWindowTitle(getLocalizedText("Настройки", "Settings"));
-        setFixedSize(500, 440);
-        setStyleSheet(R"(
-            QDialog {
-                background-color: #0B1120;
-                border: 1px solid rgba(251, 191, 36, 0.35);
-                border-radius: 16px;
-            }
-            QLabel {
-                color: #E2E8F0;
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QTabWidget::pane {
-                border: 1px solid rgba(251, 191, 36, 0.2);
-                border-radius: 12px;
-                background: rgba(15, 23, 42, 0.85);
-            }
-            QTabBar::tab {
-                background: transparent;
-                color: #94A3B8;
-                padding: 10px 20px;
-                font-size: 13px;
-                font-weight: bold;
-                border-bottom: 2px solid transparent;
-            }
-            QTabBar::tab:hover {
-                color: #F8FAFC;
-            }
-            QTabBar::tab:selected {
-                color: #FBBF24;
-                border-bottom: 2px solid #FBBF24;
-                background: rgba(251, 191, 36, 0.08);
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-            }
-            QComboBox, QLineEdit, QSpinBox {
-                padding: 8px 12px;
-                border-radius: 8px;
-                background: #1E293B;
-                color: #F8FAFC;
-                border: 1px solid #334155;
-                font-size: 13px;
-            }
-            QComboBox:hover, QLineEdit:focus, QSpinBox:focus {
-                border: 1px solid #F59E0B;
-            }
-            QComboBox::drop-down {
-                border: none;
-                width: 24px;
-            }
-            QCheckBox {
-                color: #E2E8F0;
-                font-size: 13px;
-                font-weight: bold;
-                spacing: 10px;
-            }
-            QSlider::groove:horizontal {
-                height: 6px;
-                background: #0F172A;
-                border-radius: 3px;
-            }
-            QSlider::sub-page:horizontal {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #D97706, stop:1 #FBBF24);
-                border-radius: 3px;
-            }
-            QSlider::handle:horizontal {
-                background: #FBBF24;
-                width: 18px;
-                height: 18px;
-                margin-top: -6px;
-                margin-bottom: -6px;
-                border-radius: 9px;
-                border: 2px solid #78350F;
-            }
-        )");
+
+        qreal s = parent ? std::clamp(std::min(parent->width() / 1280.0, parent->height() / 720.0), 0.7, 1.4) : 1.0;
+        int maxW = parent ? qMin(qRound(parent->width() * 0.90), qRound(500 * s)) : qRound(500 * s);
+        int maxH = parent ? qMin(qRound(parent->height() * 0.88), qRound(440 * s)) : qRound(440 * s);
+        resize(maxW, maxH);
+
+        int fTitle = qMax(16, qRound(20 * s));
+        int fBase  = qMax(12, qRound(14 * s));
+        int pad    = qMax(5, qRound(8 * s));
+
+        setStyleSheet(QString(R"(
+            QDialog { background-color: #0B1120; border: 1px solid rgba(251, 191, 36, 0.35); border-radius: %1px; }
+            QLabel { color: #E2E8F0; font-size: %2px; font-weight: bold; }
+            QTabWidget::pane { border: 1px solid rgba(251, 191, 36, 0.2); border-radius: %1px; background: rgba(15, 23, 42, 0.85); }
+            QTabBar::tab { background: transparent; color: #94A3B8; padding: %3px %4px; font-size: %2px; font-weight: bold; border-bottom: 2px solid transparent; }
+            QTabBar::tab:hover { color: #F8FAFC; }
+            QTabBar::tab:selected { color: #FBBF24; border-bottom: 2px solid #FBBF24; background: rgba(251, 191, 36, 0.08); border-top-left-radius: 6px; border-top-right-radius: 6px; }
+            QComboBox, QLineEdit, QSpinBox { padding: %3px %4px; border-radius: 6px; background: #1E293B; color: #F8FAFC; border: 1px solid #334155; font-size: %2px; }
+            QComboBox:hover, QLineEdit:focus, QSpinBox:focus { border: 1px solid #F59E0B; }
+            QComboBox::drop-down { border: none; width: %5px; }
+            QCheckBox { color: #E2E8F0; font-size: %2px; font-weight: bold; spacing: 8px; }
+            QSlider::groove:horizontal { height: %6px; background: #0F172A; border-radius: 3px; }
+            QSlider::sub-page:horizontal { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #D97706, stop:1 #FBBF24); border-radius: 3px; }
+            QSlider::handle:horizontal { background: #FBBF24; width: %7px; height: %7px; margin-top: -5px; margin-bottom: -5px; border-radius: %8px; border: 2px solid #78350F; }
+        )").arg(qRound(12 * s)).arg(fBase).arg(pad).arg(qRound(12 * s)).arg(qRound(24 * s)).arg(qRound(6 * s)).arg(qRound(16 * s)).arg(qRound(8 * s)));
 
         auto* mainLayout = new QVBoxLayout(this);
-        mainLayout->setContentsMargins(20, 20, 20, 20);
-        mainLayout->setSpacing(15);
+        mainLayout->setContentsMargins(qRound(16 * s), qRound(16 * s), qRound(16 * s), qRound(16 * s));
+        mainLayout->setSpacing(qRound(12 * s));
 
         auto* title = new QLabel(getLocalizedText("⚙ НАСТРОЙКИ", "⚙ SETTINGS"), this);
-        title->setStyleSheet("color: #FBBF24; font-size: 20px; font-weight: 900; letter-spacing: 2px;");
+        title->setStyleSheet(QString("color: #FBBF24; font-size: %1px; font-weight: 900; letter-spacing: 2px;").arg(fTitle));
         title->setAlignment(Qt::AlignCenter);
         mainLayout->addWidget(title);
 
@@ -105,8 +57,8 @@ public:
         // ВКЛАДКА 1: ЗВУК
         auto* tabAudio = new QWidget(this);
         auto* aLayout = new QVBoxLayout(tabAudio);
-        aLayout->setContentsMargins(24, 25, 24, 25);
-        aLayout->setSpacing(25);
+        aLayout->setContentsMargins(qRound(18 * s), qRound(18 * s), qRound(18 * s), qRound(18 * s));
+        aLayout->setSpacing(qRound(18 * s));
 
         auto* mBox = new QHBoxLayout();
         auto* lblMusic = new QLabel(getLocalizedText("🎵 Музыка:", "🎵 Music:"), tabAudio);
@@ -115,21 +67,17 @@ public:
         sMusic->setSingleStep(5);
         sMusic->setPageStep(5);
 
-        int curMusicVal = qRound(AudioManager::instance().getMusicVolume() * 100.0f);
-        curMusicVal = (curMusicVal / 5) * 5;
+        int curMusicVal = (qRound(AudioManager::instance().getMusicVolume() * 100.0f) / 5) * 5;
         sMusic->setValue(curMusicVal);
 
         auto* lblMusicVal = new QLabel(QString("%1%").arg(curMusicVal), tabAudio);
-        lblMusicVal->setFixedWidth(45);
+        lblMusicVal->setFixedWidth(qRound(45 * s));
         lblMusicVal->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        lblMusicVal->setStyleSheet("color: #FCD34D; font-size: 14px; font-weight: bold;");
+        lblMusicVal->setStyleSheet(QString("color: #FCD34D; font-size: %1px; font-weight: bold;").arg(fBase));
 
         connect(sMusic, &QSlider::valueChanged, this, [lblMusicVal, sMusic](int val) {
             int snapped = (val / 5) * 5;
-            if (snapped != val) {
-                sMusic->setValue(snapped);
-                return;
-            }
+            if (snapped != val) { sMusic->setValue(snapped); return; }
             AudioManager::instance().setMusicVolume(snapped / 100.0f);
             lblMusicVal->setText(QString("%1%").arg(snapped));
         });
@@ -146,21 +94,17 @@ public:
         sSfx->setSingleStep(5);
         sSfx->setPageStep(5);
 
-        int curSfxVal = qRound(AudioManager::instance().getSfxVolume() * 100.0f);
-        curSfxVal = (curSfxVal / 5) * 5;
+        int curSfxVal = (qRound(AudioManager::instance().getSfxVolume() * 100.0f) / 5) * 5;
         sSfx->setValue(curSfxVal);
 
         auto* lblSfxVal = new QLabel(QString("%1%").arg(curSfxVal), tabAudio);
-        lblSfxVal->setFixedWidth(45);
+        lblSfxVal->setFixedWidth(qRound(45 * s));
         lblSfxVal->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        lblSfxVal->setStyleSheet("color: #FCD34D; font-size: 14px; font-weight: bold;");
+        lblSfxVal->setStyleSheet(QString("color: #FCD34D; font-size: %1px; font-weight: bold;").arg(fBase));
 
         connect(sSfx, &QSlider::valueChanged, this, [lblSfxVal, sSfx](int val) {
             int snapped = (val / 5) * 5;
-            if (snapped != val) {
-                sSfx->setValue(snapped);
-                return;
-            }
+            if (snapped != val) { sSfx->setValue(snapped); return; }
             AudioManager::instance().setSfxVolume(snapped / 100.0f);
             lblSfxVal->setText(QString("%1%").arg(snapped));
         });
@@ -176,8 +120,8 @@ public:
         // ВКЛАДКА 2: ВИЗУАЛ
         auto* tabVisual = new QWidget(this);
         auto* vLayout = new QVBoxLayout(tabVisual);
-        vLayout->setContentsMargins(24, 20, 24, 20);
-        vLayout->setSpacing(12);
+        vLayout->setContentsMargins(qRound(18 * s), qRound(16 * s), qRound(18 * s), qRound(16 * s));
+        vLayout->setSpacing(qRound(10 * s));
 
         auto* nickBox = new QHBoxLayout();
         nickBox->addWidget(new QLabel(getLocalizedText("Имя игрока:", "Player name:"), tabVisual));
@@ -220,7 +164,13 @@ public:
 
         auto* chkFull = new QCheckBox(getLocalizedText("Полноэкранный режим (F11)", "Fullscreen Mode (F11)"), tabVisual);
         chkFull->setChecked(AppSettings::instance().fullScreen);
+#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
+        chkFull->setChecked(true);
+        chkFull->setEnabled(false);
+        chkFull->setText(getLocalizedText("Полноэкранный режим (Всегда включен)", "Fullscreen Mode (Always On)"));
+#endif
         vLayout->addWidget(chkFull);
+
 
         vLayout->addStretch();
         tabs->addTab(tabVisual, getLocalizedText("Визуал", "Visuals"));
@@ -228,8 +178,8 @@ public:
         // ВКЛАДКА 3: ГЕЙМПЛЕЙ И СЕТЬ
         auto* tabGame = new QWidget(this);
         auto* gLayout = new QVBoxLayout(tabGame);
-        gLayout->setContentsMargins(24, 25, 24, 25);
-        gLayout->setSpacing(20);
+        gLayout->setContentsMargins(qRound(18 * s), qRound(18 * s), qRound(18 * s), qRound(18 * s));
+        gLayout->setSpacing(qRound(14 * s));
 
         auto* chkAutoNext = new QCheckBox(getLocalizedText("Покер: Авто-старт следующей раздачи", "Poker: Auto-start next hand"), tabGame);
         chkAutoNext->setChecked(AppSettings::instance().autoNextHand);
@@ -267,20 +217,13 @@ public:
 
         auto* btnSave = new QPushButton(getLocalizedText("Сохранить и применить", "Save and apply"), this);
         btnSave->setCursor(Qt::PointingHandCursor);
-        btnSave->setStyleSheet(R"(
+        btnSave->setStyleSheet(QString(R"(
             QPushButton {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10B981);
-                color: white;
-                font-weight: bold;
-                font-size: 15px;
-                padding: 12px;
-                border-radius: 8px;
-                border: 1px solid rgba(52, 211, 153, 0.4);
+                color: white; font-weight: bold; font-size: %1px; padding: %2px; border-radius: 8px; border: 1px solid rgba(52, 211, 153, 0.4);
             }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10B981, stop:1 #34D399);
-            }
-        )");
+            QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10B981, stop:1 #34D399); }
+        )").arg(fBase + 2).arg(qRound(10 * s)));
 
         connect(btnSave, &QPushButton::clicked, this, [=]() {
             AppSettings::instance().nickname          = nickInput->text().trimmed().isEmpty() ? getLocalizedText("Игрок", "Player") : nickInput->text().trimmed();
@@ -317,57 +260,31 @@ class RulesDialog : public QDialog {
 public:
     explicit RulesDialog(int defaultTabIndex = 0, QWidget* parent = nullptr) : QDialog(parent) {
         setWindowTitle(getLocalizedText("Правила игры", "Game Rules"));
-        setFixedSize(680, 540);
-        setStyleSheet(R"(
-            QDialog {
-                background-color: #0B1120;
-                border: 1px solid rgba(251, 191, 36, 0.35);
-                border-radius: 16px;
-            }
-            QLabel { color: #FBBF24; font-size: 20px; font-weight: 900; }
-            QTabWidget::pane {
-                border: 1px solid rgba(251, 191, 36, 0.2);
-                border-radius: 12px;
-                background: rgba(15, 23, 42, 0.9);
-            }
-            QTabBar::tab {
-                background: transparent;
-                color: #94A3B8;
-                padding: 10px 18px;
-                font-size: 13px;
-                font-weight: bold;
-                border-bottom: 2px solid transparent;
-            }
+
+        qreal s = parent ? std::clamp(std::min(parent->width() / 1280.0, parent->height() / 720.0), 0.7, 1.4) : 1.0;
+        int maxW = parent ? qMin(qRound(parent->width() * 0.90), qRound(660 * s)) : qRound(660 * s);
+        int maxH = parent ? qMin(qRound(parent->height() * 0.88), qRound(480 * s)) : qRound(480 * s);
+        resize(maxW, maxH);
+
+        int fTitle = qMax(16, qRound(20 * s));
+        int fBase  = qMax(12, qRound(13 * s));
+        int pad    = qMax(5, qRound(8 * s));
+
+        setStyleSheet(QString(R"(
+            QDialog { background-color: #0B1120; border: 1px solid rgba(251, 191, 36, 0.35); border-radius: %1px; }
+            QLabel { color: #FBBF24; font-size: %2px; font-weight: 900; }
+            QTabWidget::pane { border: 1px solid rgba(251, 191, 36, 0.2); border-radius: %1px; background: rgba(15, 23, 42, 0.9); }
+            QTabBar::tab { background: transparent; color: #94A3B8; padding: %3px %4px; font-size: %5px; font-weight: bold; border-bottom: 2px solid transparent; }
             QTabBar::tab:hover { color: #F8FAFC; }
-            QTabBar::tab:selected {
-                color: #FBBF24;
-                border-bottom: 2px solid #FBBF24;
-                background: rgba(251, 191, 36, 0.08);
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-            }
-            QTextBrowser {
-                background: transparent;
-                border: none;
-                color: #E2E8F0;
-                font-size: 13px;
-                line-height: 1.5;
-                padding: 12px;
-            }
-            QScrollBar:vertical {
-                background: #0F172A;
-                width: 8px;
-                border-radius: 4px;
-            }
-            QScrollBar::handle:vertical {
-                background: #334155;
-                border-radius: 4px;
-            }
-        )");
+            QTabBar::tab:selected { color: #FBBF24; border-bottom: 2px solid #FBBF24; background: rgba(251, 191, 36, 0.08); border-top-left-radius: 6px; border-top-right-radius: 6px; }
+            QTextBrowser { background: transparent; border: none; color: #E2E8F0; font-size: %5px; line-height: 1.5; padding: %3px; }
+            QScrollBar:vertical { background: #0F172A; width: 8px; border-radius: 4px; }
+            QScrollBar::handle:vertical { background: #334155; border-radius: 4px; }
+        )").arg(qRound(12 * s)).arg(fTitle).arg(pad).arg(qRound(14 * s)).arg(fBase));
 
         auto* mainLayout = new QVBoxLayout(this);
-        mainLayout->setContentsMargins(20, 18, 20, 18);
-        mainLayout->setSpacing(12);
+        mainLayout->setContentsMargins(qRound(16 * s), qRound(16 * s), qRound(16 * s), qRound(16 * s));
+        mainLayout->setSpacing(qRound(10 * s));
 
         auto* title = new QLabel(getLocalizedText("📖 ПРАВИЛА ИГР", "📖 GAME RULES"), this);
         title->setAlignment(Qt::AlignCenter);
@@ -378,14 +295,13 @@ public:
         auto createRuleTab = [&](const QString& textHtml) -> QWidget* {
             auto* page = new QWidget(this);
             auto* l = new QVBoxLayout(page);
-            l->setContentsMargins(10, 10, 10, 10);
+            l->setContentsMargins(6, 6, 6, 6);
             auto* browser = new QTextBrowser(page);
             browser->setHtml(textHtml);
             l->addWidget(browser);
             return page;
         };
 
-        // ТЕКСТЫ ПРАВИЛ
         QString pokerRules = getLocalizedText(
             "<h3>Покер (Texas Hold'em)</h3>"
             "<p><b>Колода:</b> 52 карты. Каждый игрок получает по 2 закрытые карты, а на стол поочерёдно выкладываются 5 общих карт (Флоп, Тёрн, Ривер).</p>"
@@ -452,30 +368,25 @@ public:
 
         auto* btnClose = new QPushButton(getLocalizedText("Закрыть", "Close"), this);
         btnClose->setCursor(Qt::PointingHandCursor);
-        btnClose->setStyleSheet(R"(
+        btnClose->setStyleSheet(QString(R"(
             QPushButton {
-                background: rgba(30, 41, 59, 0.9);
-                color: #F8FAFC;
-                font-weight: bold;
-                font-size: 14px;
-                padding: 10px;
-                border-radius: 8px;
-                border: 1px solid #475569;
+                background: rgba(30, 41, 59, 0.9); color: #F8FAFC; font-weight: bold; font-size: %1px; padding: %2px; border-radius: 8px; border: 1px solid #475569;
             }
             QPushButton:hover { background: #334155; border: 1px solid #FBBF24; }
-        )");
+        )").arg(fBase + 1).arg(qRound(8 * s)));
         connect(btnClose, &QPushButton::clicked, this, &QDialog::accept);
         mainLayout->addWidget(btnClose);
     }
 };
+
 
 // ============================================================================
 // BASE TABLE WIDGET
 // ============================================================================
 
 BaseTableWidget::BaseTableWidget(QWidget* parent) : QWidget(parent) {
-#if !defined(Q_OS_IOS)
-    setMinimumSize(1000, 720);
+#if !defined(Q_OS_IOS) && !defined(Q_OS_ANDROID)
+    setMinimumSize(640, 360);
 #endif
     setMouseTracking(true);
 
@@ -486,10 +397,10 @@ BaseTableWidget::BaseTableWidget(QWidget* parent) : QWidget(parent) {
     btnRules    = new QPushButton("📖", this);
 
     btnBackMenu->setStyleSheet("QPushButton { background: rgba(0,0,0,0.5); color: #D1D5DB; border-radius: 6px; padding: 5px; font-weight: bold; } QPushButton:hover { background: rgba(0,0,0,0.7); color: white; }");
-    lblStatus->setStyleSheet("QLabel { color: #F3F4F6; font-size: 18px; font-weight: bold; }");
-    btnNextHand->setStyleSheet("QPushButton { background: #10B981; color: white; font-weight: bold; border-radius: 8px; padding: 10px; font-size: 15px; } QPushButton:hover { background: #34D399; }");
-    btnSettings->setStyleSheet("QPushButton { background: rgba(0,0,0,0.5); color: #D1D5DB; border-radius: 6px; font-size: 18px; font-weight: bold; } QPushButton:hover { background: rgba(0,0,0,0.7); color: #FBBF24; }");
-    btnRules->setStyleSheet("QPushButton { background: rgba(0,0,0,0.5); color: #D1D5DB; border-radius: 6px; font-size: 16px; font-weight: bold; } QPushButton:hover { background: rgba(0,0,0,0.7); color: #FBBF24; }");
+    lblStatus->setStyleSheet("QLabel { color: #F3F4F6; font-weight: bold; }");
+    btnNextHand->setStyleSheet("QPushButton { background: #10B981; color: white; font-weight: bold; border-radius: 8px; padding: 10px; } QPushButton:hover { background: #34D399; }");
+    btnSettings->setStyleSheet("QPushButton { background: rgba(0,0,0,0.5); color: #D1D5DB; border-radius: 6px; font-weight: bold; } QPushButton:hover { background: rgba(0,0,0,0.7); color: #FBBF24; }");
+    btnRules->setStyleSheet("QPushButton { background: rgba(0,0,0,0.5); color: #D1D5DB; border-radius: 6px; font-weight: bold; } QPushButton:hover { background: rgba(0,0,0,0.7); color: #FBBF24; }");
 
     btnBackMenu->setCursor(Qt::PointingHandCursor);
     btnNextHand->setCursor(Qt::PointingHandCursor);
@@ -515,18 +426,40 @@ BaseTableWidget::BaseTableWidget(QWidget* parent) : QWidget(parent) {
 
 void BaseTableWidget::resizeEvent(QResizeEvent* ev) {
     QWidget::resizeEvent(ev);
-    btnBackMenu->setGeometry(15, 15, 100, 35);
-    btnSettings->setGeometry(width() - 55, 15, 40, 35); // В правом верхнем углу
-    btnRules->setGeometry(width() - 100, 15, 40, 35);
-    lblStatus->setGeometry(130, 15, width() - 150, 40);
-    btnNextHand->setGeometry(width() / 2 - 125, height() / 2 + 70, 250, 55);
+    qreal s = getScale();
+
+    int btnH = qRound(36 * s);
+    int btnBackW = qRound(110 * s);
+    int iconBtnW = qRound(40 * s);
+
+    btnBackMenu->setGeometry(qRound(15 * s), qRound(15 * s), btnBackW, btnH);
+    btnBackMenu->setFont(QFont("Segoe UI", qMax(8, qRound(12 * s)), QFont::Bold));
+
+    btnSettings->setGeometry(width() - iconBtnW - qRound(15 * s), qRound(15 * s), iconBtnW, btnH);
+    btnSettings->setFont(QFont("Segoe UI", qMax(12, qRound(20 * s)), QFont::Bold));
+
+    btnRules->setGeometry(width() - iconBtnW * 2 - qRound(25 * s), qRound(15 * s), iconBtnW, btnH);
+    btnRules->setFont(QFont("Segoe UI", qMax(12, qRound(20 * s)), QFont::Bold));
+
+    lblStatus->setGeometry(btnBackW + qRound(30 * s), qRound(15 * s), width() - btnBackW - iconBtnW * 2 - qRound(90 * s), btnH);
+    lblStatus->setFont(QFont("Segoe UI", qMax(9, qRound(15 * s)), QFont::Bold));
+
+    int nextW = qRound(260 * s);
+    int nextH = qRound(55 * s);
+    btnNextHand->setGeometry(width() / 2 - nextW / 2, height() / 2 + qRound(60 * s), nextW, nextH);
+    btnNextHand->setFont(QFont("Segoe UI", qMax(9, qRound(14 * s)), QFont::Bold));
 }
 
 void BaseTableWidget::drawTableFelt(QPainter& p) {
     p.fillRect(rect(), QColor(20, 20, 20));
-    QRect feltRect = rect().adjusted(25, 25, -25, -25);
+    qreal s = getScale();
+    int margin = qMax(6, qRound(16 * s));
+    QRect feltRect = rect().adjusted(margin, margin, -margin, -margin);
+
+    // Радиус закругления всегда рассчитывается от реальных пропорций экрана
+    int cornerRadius = qMin(feltRect.width() / 4, feltRect.height() / 2);
     QPainterPath tablePath;
-    tablePath.addRoundedRect(feltRect, 200, 200);
+    tablePath.addRoundedRect(feltRect, cornerRadius, cornerRadius);
 
     QColor c1, c2;
     switch (AppSettings::instance().tableColor) {
@@ -541,23 +474,32 @@ void BaseTableWidget::drawTableFelt(QPainter& p) {
     bgGrad.setColorAt(1, c2);
     p.fillPath(tablePath, bgGrad);
 
-    p.setPen(QPen(QColor(0, 0, 0, 120), 6));
+    p.setPen(QPen(QColor(0, 0, 0, 120), qMax(2, qRound(4 * s))));
     p.drawPath(tablePath);
 }
 
 void BaseTableWidget::drawGameOverBanner(QPainter& p, const QString& message) {
+    qreal s = getScale();
     p.fillRect(rect(), QColor(0, 0, 0, 110));
-    QRect bannerRect(width() / 2 - 220, height() / 2 - 125, 440, 60);
+
+    int bannerW = qRound(440 * s);
+    int bannerH = qRound(65 * s);
+    QRect bannerRect(width() / 2 - bannerW / 2, height() / 2 - qRound(125 * s), bannerW, bannerH);
+
     p.setBrush(QColor(15, 23, 42, 240));
-    p.setPen(QPen(QColor(251, 191, 36, 220), 2));
-    p.drawRoundedRect(bannerRect, 10, 10);
+    p.setPen(QPen(QColor(251, 191, 36, 220), qMax(1, qRound(2 * s))));
+    p.drawRoundedRect(bannerRect, qRound(10 * s), qRound(10 * s));
 
     p.setPen(QColor(252, 211, 77));
-    p.setFont(QFont("Segoe UI", 16, QFont::Bold));
+    p.setFont(QFont("Segoe UI", qMax(10, qRound(16 * s)), QFont::Bold));
     p.drawText(bannerRect, Qt::AlignCenter | Qt::TextWordWrap, message);
 }
 
 QVector<QPoint> BaseTableWidget::getSeatPositions(int numPlayers, int width, int height, int bottomYOffset, int topYOffset) {
+    qreal s = std::clamp(std::min(width / 1280.0, height / 720.0), 0.45, 2.5);
+    int sideX = qMax(80, qRound(120 * s));
+    int sideY = height / 2 - qRound(70 * s);
+
     if (numPlayers == 2) {
         return {
             QPoint(width / 2, height - bottomYOffset),
@@ -567,15 +509,15 @@ QVector<QPoint> BaseTableWidget::getSeatPositions(int numPlayers, int width, int
     if (numPlayers == 3) {
         return {
             QPoint(width / 2, height - bottomYOffset),
-            QPoint(150, height / 2 - 100),
-            QPoint(width - 150, height / 2 - 100)
+            QPoint(sideX, sideY),
+            QPoint(width - sideX, sideY)
         };
     }
     return {
         QPoint(width / 2, height - bottomYOffset),
-        QPoint(150, height / 2 - 100),
+        QPoint(sideX, sideY),
         QPoint(width / 2, topYOffset),
-        QPoint(width - 150, height / 2 - 100)
+        QPoint(width - sideX, sideY)
     };
 }
 
@@ -622,18 +564,22 @@ void BaseTableWidget::drawCard(QPainter& p, const QRect& rect, const Card* card,
     QString suitTxt = suitsStr[card->suit];
     QString rankTxt = ranksStr[card->rank];
 
-    p.setFont(QFont("Arial", 12, QFont::Bold));
-    p.drawText(rect.adjusted(5, 3, -3, -3), Qt::AlignTop | Qt::AlignLeft, rankTxt + "\n" + suitTxt);
+    // Масштабируемый шрифт углового индекса
+    int cornerFontSize = qMax(7, qRound(rect.height() * 0.11));
+    p.setFont(QFont("Arial", cornerFontSize, QFont::Bold));
+    p.drawText(rect.adjusted(4, 2, -2, -2), Qt::AlignTop | Qt::AlignLeft, rankTxt + "\n" + suitTxt);
 
     p.save();
     p.translate(rect.center());
     p.rotate(180);
-    p.setFont(QFont("Arial", 12, QFont::Bold));
+    p.setFont(QFont("Arial", cornerFontSize, QFont::Bold));
     QRectF localRect(-rect.width() / 2.0, -rect.height() / 2.0, rect.width(), rect.height());
-    p.drawText(localRect.adjusted(5, 3, -3, -3), Qt::AlignTop | Qt::AlignLeft, rankTxt + "\n" + suitTxt);
+    p.drawText(localRect.adjusted(4, 2, -2, -2), Qt::AlignTop | Qt::AlignLeft, rankTxt + "\n" + suitTxt);
     p.restore();
 
-    p.setFont(QFont("Arial", 32));
+    // Масштабируемый шрифт масти в центре
+    int centerFontSize = qMax(12, qRound(rect.height() * 0.32));
+    p.setFont(QFont("Arial", centerFontSize));
     p.drawText(rect, Qt::AlignCenter, suitTxt);
 
     p.restore();
@@ -644,36 +590,70 @@ void BaseTableWidget::drawCard(QPainter& p, const QRect& rect, const Card* card,
 // ============================================================================
 
 MainMenuWidget::MainMenuWidget(QWidget* parent) : QWidget(parent) {
-    auto* mainLayout = new QVBoxLayout(this);
+    auto* rootLayout = new QVBoxLayout(this);
+    rootLayout->setContentsMargins(0, 0, 0, 0);
+
+    auto* scrollArea = new QScrollArea(this);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
+    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+
+    // Включаем нативный кинетический тач-скролл пальцем по всему экрану
+    QScroller::grabGesture(scrollArea->viewport(), QScroller::LeftMouseButtonGesture);
+    QScroller::grabGesture(scrollArea->viewport(), QScroller::TouchGesture);
+
+    // Стильный тонкий скроллбар в золотом стиле Royal Card Club
+    scrollArea->setStyleSheet(R"(
+        QScrollArea { background: transparent; border: none; }
+        QScrollBar:vertical {
+            background: transparent;
+            width: 5px;
+            margin: 4px 2px 4px 0px;
+        }
+        QScrollBar::handle:vertical {
+            background: rgba(251, 191, 36, 0.35);
+            border-radius: 2px;
+            min-height: 30px;
+        }
+        QScrollBar::handle:vertical:hover {
+            background: rgba(251, 191, 36, 0.8);
+        }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+        QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+            background: none;
+            height: 0px;
+        }
+    )");
+
+    auto* container = new QWidget(scrollArea);
+    container->setStyleSheet("background: transparent;");
+    auto* mainLayout = new QVBoxLayout(container);
     mainLayout->setAlignment(Qt::AlignCenter);
 
-    auto* lblTitle = new QLabel(getLocalizedText("ROYAL CARD CLUB", "ROYAL CARD CLUB"), this);
-    lblTitle->setStyleSheet("QLabel { color: #FBBF24; font-size: 52px; font-weight: 900; letter-spacing: 4px; }");
-    lblTitle->setAlignment(Qt::AlignCenter);
-
-    auto* lblSub = new QLabel(getLocalizedText("♠   ♥   ПОКЕР • ДУРАК • КОЗЁЛ • УНО   ♣   ♦", "♠   ♥   POKER • DURAK • KOZEL • UNO   ♣   ♦"), this);
-    lblSub->setStyleSheet("QLabel { color: #D97706; font-size: 13px; font-weight: 800; letter-spacing: 4px; margin-bottom: 15px; }");
-    lblSub->setAlignment(Qt::AlignCenter);
-
-    QString frameStyle = "QFrame#panel { background: rgba(20, 27, 44, 0.88); border-radius: 16px; border: 1px solid rgba(251, 191, 36, 0.25); }";
-    QString comboStyle = "QComboBox { padding: 8px 14px; border-radius: 8px; background: #182234; color: #F9FAFB; border: 1px solid #374151; font-size: 14px; } "
+    QString frameStyle = "QFrame#panel { background: rgba(20, 27, 44, 0.88); border-radius: 14px; border: 1px solid rgba(251, 191, 36, 0.25); }";
+    QString comboStyle = "QComboBox { padding: 4px 10px; border-radius: 8px; background: #182234; color: #F9FAFB; border: 1px solid #374151; } "
     "QComboBox:hover { border: 1px solid #F59E0B; } "
-    "QComboBox::drop-down { border: none; width: 30px; } "
-    "QComboBox QAbstractItemView { background: #182234; color: #F9FAFB; selection-background-color: #2563EB; border: 1px solid #374151; padding: 5px; }";
-    QString inputStyle = "QLineEdit { padding: 10px 14px; border-radius: 8px; background: #182234; color: #F9FAFB; border: 1px solid #374151; font-size: 14px; } "
+    "QComboBox::drop-down { border: none; width: 28px; } "
+    "QComboBox QAbstractItemView { background: #182234; color: #F9FAFB; selection-background-color: #2563EB; border: 1px solid #374151; padding: 4px; }";
+    QString inputStyle = "QLineEdit { padding: 4px 10px; border-radius: 8px; background: #182234; color: #F9FAFB; border: 1px solid #374151; } "
     "QLineEdit:focus { border: 1px solid #F59E0B; }";
 
-    auto* selectFrame = new QFrame(this);
+    lblTitle = new QLabel(getLocalizedText("ROYAL CARD CLUB", "ROYAL CARD CLUB"), container);
+    lblTitle->setStyleSheet("color: #FBBF24; font-weight: 900;");
+    lblTitle->setAlignment(Qt::AlignCenter);
+
+    lblSub = new QLabel(getLocalizedText("♠   ♥   ПОКЕР • ДУРАК • КОЗЁЛ • УНО   ♣   ♦", "♠   ♥   POKER • DURAK • KOZEL • UNO   ♣   ♦"), container);
+    lblSub->setStyleSheet("color: #D97706; font-weight: 800;");
+    lblSub->setAlignment(Qt::AlignCenter);
+
+    selectFrame = new QFrame(container);
     selectFrame->setObjectName("panel");
     selectFrame->setStyleSheet(frameStyle);
-    selectFrame->setMaximumWidth(580);
-    selectFrame->setMinimumWidth(460);
-
     auto* selectLayout = new QVBoxLayout(selectFrame);
-    selectLayout->setContentsMargins(24, 15, 24, 15);
 
-    auto* lblSelect = new QLabel(getLocalizedText("Выберите игру:", "Select game:"), selectFrame);
-    lblSelect->setStyleSheet("color: #F3F4F6; font-size: 15px; font-weight: bold; margin-bottom: 2px;");
+    lblSelectHeader = new QLabel(getLocalizedText("Выберите игру:", "Select game:"), selectFrame);
+    lblSelectHeader->setStyleSheet("color: #F3F4F6; font-weight: bold;");
 
     comboGameType = new QComboBox(selectFrame);
     comboGameType->addItem(getLocalizedText("Покер (Texas Hold'em)", "Poker (Texas Hold'em)"), 0);
@@ -682,24 +662,21 @@ MainMenuWidget::MainMenuWidget(QWidget* parent) : QWidget(parent) {
     comboGameType->addItem(getLocalizedText("Уно", "UNO"), 3);
     comboGameType->setStyleSheet(comboStyle);
     comboGameType->setCursor(Qt::PointingHandCursor);
-    comboGameType->setFixedHeight(42);
 
-    selectLayout->addWidget(lblSelect);
+    selectLayout->addWidget(lblSelectHeader);
     selectLayout->addWidget(comboGameType);
 
-    auto* botFrame = new QFrame(this);
+    botFrame = new QFrame(container);
     botFrame->setObjectName("panel");
     botFrame->setStyleSheet(frameStyle);
-    botFrame->setMaximumWidth(580);
-    botFrame->setMinimumWidth(460);
-
     auto* botLayout = new QVBoxLayout(botFrame);
-    botLayout->setContentsMargins(24, 15, 24, 18);
-    botLayout->setSpacing(10);
+
+    lblSingleHeader = new QLabel(getLocalizedText("Одиночная игра (с Ботами):", "Singleplayer (vs Bots):"), botFrame);
+    lblSingleHeader->setStyleSheet("color: #F3F4F6; font-weight: bold;");
 
     auto* comboLayout = new QHBoxLayout();
-    auto* lblBots = new QLabel(getLocalizedText("Соперники:", "Opponents:"), botFrame);
-    lblBots->setStyleSheet("color: #9CA3AF; font-size: 14px; font-weight: bold;");
+    lblOpponents = new QLabel(getLocalizedText("Соперники:", "Opponents:"), botFrame);
+    lblOpponents->setStyleSheet("color: #9CA3AF; font-weight: bold;");
 
     comboBots = new QComboBox(botFrame);
     comboBots->addItem(getLocalizedText("1 Бот (Голова к голове)", "1 Bot (Heads Up)"), 1);
@@ -707,32 +684,29 @@ MainMenuWidget::MainMenuWidget(QWidget* parent) : QWidget(parent) {
     comboBots->addItem(getLocalizedText("3 Бота (4 Макс.)", "3 Bots (4 Max)"), 3);
     comboBots->setStyleSheet(comboStyle);
     comboBots->setCursor(Qt::PointingHandCursor);
-    comboBots->setFixedHeight(42);
 
-    comboLayout->addWidget(lblBots);
+    comboLayout->addWidget(lblOpponents);
     comboLayout->addWidget(comboBots);
 
     btnStartBotGame = new QPushButton(getLocalizedText("Начать игру", "Start Game"), botFrame);
-    btnStartBotGame->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10B981); color: white; font-weight: bold; font-size: 15px; padding: 12px; border-radius: 8px; border: none; } "
+    btnStartBotGame->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10B981); color: white; font-weight: bold; border-radius: 8px; border: none; } "
     "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10B981, stop:1 #34D399); }");
     btnStartBotGame->setCursor(Qt::PointingHandCursor);
 
-    botLayout->addWidget(new QLabel(getLocalizedText("Одиночная игра (с Ботами):", "Singleplayer (vs Bots):"), botFrame));
+    botLayout->addWidget(lblSingleHeader);
     botLayout->addLayout(comboLayout);
     botLayout->addWidget(btnStartBotGame);
 
-    auto* netFrame = new QFrame(this);
+    netFrame = new QFrame(container);
     netFrame->setObjectName("panel");
     netFrame->setStyleSheet(frameStyle);
-    netFrame->setMaximumWidth(580);
-    netFrame->setMinimumWidth(460);
-
     auto* netLayout = new QVBoxLayout(netFrame);
-    netLayout->setContentsMargins(24, 15, 24, 18);
-    netLayout->setSpacing(10);
+
+    lblMultiHeader = new QLabel(getLocalizedText("Сетевая игра (LAN / IP):", "Multiplayer (LAN / IP):"), netFrame);
+    lblMultiHeader->setStyleSheet("color: #F3F4F6; font-weight: bold;");
 
     btnHostServer = new QPushButton(getLocalizedText("Создать сервер", "Create Server"), netFrame);
-    btnHostServer->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1D4ED8, stop:1 #3B82F6); color: white; font-weight: bold; font-size: 15px; padding: 12px; border-radius: 8px; border: none; } "
+    btnHostServer->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1D4ED8, stop:1 #3B82F6); color: white; font-weight: bold; border-radius: 8px; border: none; } "
     "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563EB, stop:1 #60A5FA); }");
     btnHostServer->setCursor(Qt::PointingHandCursor);
 
@@ -741,37 +715,27 @@ MainMenuWidget::MainMenuWidget(QWidget* parent) : QWidget(parent) {
     ipInput->setPlaceholderText("127.0.0.1");
     ipInput->setText("127.0.0.1");
     ipInput->setStyleSheet(inputStyle);
-    ipInput->setFixedHeight(44);
 
     btnConnectIP = new QPushButton(getLocalizedText("Подключиться", "Connect"), netFrame);
-    btnConnectIP->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #B45309, stop:1 #F59E0B); color: white; font-weight: bold; font-size: 15px; padding: 12px; border-radius: 8px; border: none; } "
+    btnConnectIP->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #B45309, stop:1 #F59E0B); color: white; font-weight: bold; border-radius: 8px; border: none; } "
     "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #D97706, stop:1 #FBBF24); }");
     btnConnectIP->setCursor(Qt::PointingHandCursor);
-    btnConnectIP->setFixedHeight(44);
 
     connectLayout->addWidget(ipInput, 1);
     connectLayout->addWidget(btnConnectIP, 1);
 
-    netLayout->addWidget(new QLabel(getLocalizedText("Сетевая игра (LAN / IP):", "Multiplayer (LAN / IP):"), netFrame));
+    netLayout->addWidget(lblMultiHeader);
     netLayout->addWidget(btnHostServer);
     netLayout->addLayout(connectLayout);
 
-    btnSettings = new QPushButton(getLocalizedText("Настройки", "Settings"), this);
-    btnSettings->setMaximumWidth(580);
-    btnSettings->setMinimumWidth(460);
-    btnSettings->setStyleSheet(
-        "QPushButton { background: rgba(20, 27, 44, 0.88); color: #F3F4F6; font-weight: bold; font-size: 14px; padding: 12px; border-radius: 12px; border: 1px solid rgba(251, 191, 36, 0.3); } "
-        "QPushButton:hover { background: rgba(30, 41, 65, 0.95); border: 1px solid #F59E0B; }"
-    );
+    btnSettings = new QPushButton(getLocalizedText("Настройки", "Settings"), container);
+    btnSettings->setStyleSheet("QPushButton { background: rgba(20, 27, 44, 0.88); color: #F3F4F6; font-weight: bold; border-radius: 10px; border: 1px solid rgba(251, 191, 36, 0.3); } "
+    "QPushButton:hover { background: rgba(30, 41, 65, 0.95); border: 1px solid #F59E0B; }");
     btnSettings->setCursor(Qt::PointingHandCursor);
 
-    btnRules = new QPushButton(getLocalizedText("Правила игры", "Game Rules"), this);
-    btnRules->setMaximumWidth(580);
-    btnRules->setMinimumWidth(460);
-    btnRules->setStyleSheet(
-        "QPushButton { background: rgba(20, 27, 44, 0.88); color: #F3F4F6; font-weight: bold; font-size: 14px; padding: 12px; border-radius: 12px; border: 1px solid rgba(251, 191, 36, 0.3); } "
-        "QPushButton:hover { background: rgba(30, 41, 65, 0.95); border: 1px solid #F59E0B; }"
-    );
+    btnRules = new QPushButton(getLocalizedText("Правила игры", "Game Rules"), container);
+    btnRules->setStyleSheet("QPushButton { background: rgba(20, 27, 44, 0.88); color: #F3F4F6; font-weight: bold; border-radius: 10px; border: 1px solid rgba(251, 191, 36, 0.3); } "
+    "QPushButton:hover { background: rgba(30, 41, 65, 0.95); border: 1px solid #F59E0B; }");
     btnRules->setCursor(Qt::PointingHandCursor);
 
     connect(btnSettings, &QPushButton::clicked, this, [this]() {
@@ -783,15 +747,59 @@ MainMenuWidget::MainMenuWidget(QWidget* parent) : QWidget(parent) {
     mainLayout->addWidget(lblTitle);
     mainLayout->addWidget(lblSub);
     mainLayout->addWidget(selectFrame, 0, Qt::AlignHCenter);
-    mainLayout->addSpacing(10);
+    mainLayout->addSpacing(6);
     mainLayout->addWidget(botFrame, 0, Qt::AlignHCenter);
-    mainLayout->addSpacing(10);
+    mainLayout->addSpacing(6);
     mainLayout->addWidget(netFrame, 0, Qt::AlignHCenter);
-    mainLayout->addSpacing(10);
+    mainLayout->addSpacing(6);
     mainLayout->addWidget(btnSettings, 0, Qt::AlignHCenter);
-    mainLayout->addSpacing(10);
+    mainLayout->addSpacing(6);
     mainLayout->addWidget(btnRules, 0, Qt::AlignHCenter);
-    mainLayout->addStretch();
+
+    scrollArea->setWidget(container);
+    rootLayout->addWidget(scrollArea);
+}
+
+void MainMenuWidget::resizeEvent(QResizeEvent* ev) {
+    QWidget::resizeEvent(ev);
+    // Плавный сбалансированный масштаб меню
+    qreal s = std::clamp(std::min(width() / 1100.0, height() / 720.0), 0.6, 1.4);
+
+    lblTitle->setFont(QFont("Segoe UI", qMax(18, qRound(38 * s)), QFont::Black));
+    lblSub->setFont(QFont("Segoe UI", qMax(8, qRound(11 * s)), QFont::Bold));
+
+    int panelW = qRound(480 * s);
+    selectFrame->setFixedWidth(panelW);
+    botFrame->setFixedWidth(panelW);
+    netFrame->setFixedWidth(panelW);
+    btnSettings->setFixedWidth(panelW);
+    btnRules->setFixedWidth(panelW);
+
+    int itemH = qRound(38 * s);
+    QFont fHeader("Segoe UI", qMax(9, qRound(12 * s)), QFont::Bold);
+    QFont fNorm("Segoe UI", qMax(9, qRound(12 * s)), QFont::Bold);
+
+    lblSelectHeader->setFont(fHeader);
+    lblSingleHeader->setFont(fHeader);
+    lblOpponents->setFont(fHeader);
+    lblMultiHeader->setFont(fHeader);
+
+    comboGameType->setFixedHeight(itemH);
+    comboGameType->setFont(fNorm);
+    comboBots->setFixedHeight(itemH);
+    comboBots->setFont(fNorm);
+    btnStartBotGame->setFixedHeight(itemH);
+    btnStartBotGame->setFont(fNorm);
+    btnHostServer->setFixedHeight(itemH);
+    btnHostServer->setFont(fNorm);
+    ipInput->setFixedHeight(itemH);
+    ipInput->setFont(fNorm);
+    btnConnectIP->setFixedHeight(itemH);
+    btnConnectIP->setFont(fNorm);
+    btnSettings->setFixedHeight(itemH);
+    btnSettings->setFont(fNorm);
+    btnRules->setFixedHeight(itemH);
+    btnRules->setFont(fNorm);
 }
 
 void MainMenuWidget::paintEvent(QPaintEvent*) {
@@ -804,10 +812,11 @@ void MainMenuWidget::paintEvent(QPaintEvent*) {
     bg.setColorAt(1.0, QColor(6, 9, 16));
     p.fillRect(rect(), bg);
 
-    int suitSize = qBound(140, int(height() * 0.22), 240);
-    int panelW = qMin(580, int(width() * 0.8));
-    double leftX = (width() - panelW) / 2.0 - suitSize * 0.5;
-    double rightX = (width() + panelW) / 2.0 + suitSize * 0.5;
+    // Динамический размер и точное позиционирование фоновых мастей относительно панелей
+    int suitSize = qBound(120, qRound(height() * 0.22), 260);
+    int currentPanelW = selectFrame ? selectFrame->width() : qMin(500, int(width() * 0.8));
+    double leftX = (width() - currentPanelW) / 2.0 - suitSize * 0.55;
+    double rightX = (width() + currentPanelW) / 2.0 + suitSize * 0.55;
 
     auto drawWatermark = [&](double x, double y, const QString& suit, double angle) {
         p.save();
@@ -840,13 +849,13 @@ PokerWidget::PokerWidget(NetworkManager* netMgr, QWidget* parent)
     raiseSlider    = new QSlider(Qt::Horizontal, this);
     lblRaiseAmount = new QLabel("$0", this);
 
-    QString btnStyle = "QPushButton { background: %1; color: white; font-weight: bold; font-size: 15px; border-radius: 8px; border: none; } QPushButton:hover { background: %2; }";
+    QString btnStyle = "QPushButton { background: %1; color: white; font-weight: bold; border-radius: 8px; border: none; } QPushButton:hover { background: %2; }";
     btnFold->setStyleSheet(btnStyle.arg("#EF4444", "#F87171"));
     btnCall->setStyleSheet(btnStyle.arg("#3B82F6", "#60A5FA"));
     btnRaise->setStyleSheet(btnStyle.arg("#F59E0B", "#FBBF24"));
     btnStartNetGame->setStyleSheet(btnStyle.arg("#8B5CF6", "#A78BFA"));
 
-    lblRaiseAmount->setStyleSheet("QLabel { color: #FCD34D; font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.5); border-radius: 4px; padding: 4px; }");
+    lblRaiseAmount->setStyleSheet("QLabel { color: #FCD34D; font-weight: bold; background: rgba(0,0,0,0.5); border-radius: 4px; padding: 4px; }");
     lblRaiseAmount->setAlignment(Qt::AlignCenter);
 
     btnFold->setCursor(Qt::PointingHandCursor);
@@ -1107,15 +1116,29 @@ void PokerWidget::updateUI() {
 
 void PokerWidget::resizeEvent(QResizeEvent* ev) {
     BaseTableWidget::resizeEvent(ev);
-    int btnY = height() - 75;
-    btnFold->setGeometry(width() / 2 - 250, btnY, 130, 50);
-    btnCall->setGeometry(width() / 2 - 100, btnY, 140, 50);
+    qreal s = getScale();
 
-    raiseSlider->setGeometry(width() / 2 + 60, btnY, 140, 20);
-    lblRaiseAmount->setGeometry(width() / 2 + 60, btnY + 25, 140, 25);
-    btnRaise->setGeometry(width() / 2 + 220, btnY, 130, 50);
+    int btnW = qRound(110 * s);
+    int btnH = qRound(44 * s);
+    int sliderW = qRound(120 * s);
+    int btnY = height() - btnH - qRound(18 * s);
 
-    btnStartNetGame->setGeometry(width() / 2 - 150, height() / 2 + 50, 300, 60);
+    btnFold->setGeometry(width() / 2 - btnW * 2 - qRound(15 * s), btnY, btnW, btnH);
+    btnCall->setGeometry(width() / 2 - btnW - qRound(5 * s), btnY, btnW, btnH);
+    raiseSlider->setGeometry(width() / 2 + qRound(5 * s), btnY, sliderW, qRound(18 * s));
+    lblRaiseAmount->setGeometry(width() / 2 + qRound(5 * s), btnY + qRound(20 * s), sliderW, qRound(22 * s));
+    btnRaise->setGeometry(width() / 2 + sliderW + qRound(15 * s), btnY, btnW, btnH);
+
+    QFont btnFont("Segoe UI", qMax(8, qRound(12 * s)), QFont::Bold);
+    btnFold->setFont(btnFont);
+    btnCall->setFont(btnFont);
+    btnRaise->setFont(btnFont);
+    lblRaiseAmount->setFont(btnFont);
+
+    int startNetW = qRound(260 * s);
+    int startNetH = qRound(50 * s);
+    btnStartNetGame->setGeometry(width() / 2 - startNetW / 2, height() / 2 + qRound(40 * s), startNetW, startNetH);
+    btnStartNetGame->setFont(btnFont);
 }
 
 void PokerWidget::paintEvent(QPaintEvent*) {
@@ -1124,30 +1147,40 @@ void PokerWidget::paintEvent(QPaintEvent*) {
 
     drawTableFelt(p);
 
+    qreal s = getScale();
+
     if (netManager && netManager->isNetworkGame && netManager->isLobby) {
         p.setPen(QColor(255, 215, 0));
-        p.setFont(QFont("Segoe UI", 24, QFont::Bold));
+        p.setFont(QFont("Segoe UI", qMax(12, qRound(22 * s)), QFont::Bold));
         p.drawText(rect(), Qt::AlignCenter, lblStatus->text());
         return;
     }
 
     if (!engine.players.isEmpty()) {
+        // Банк (POT)
         p.setPen(QColor(252, 211, 77));
-        p.setFont(QFont("Segoe UI", 18, QFont::Bold));
-        p.drawText(QRect(0, height() / 2 - 120, width(), 30), Qt::AlignCenter, QString("POT: $%1").arg(engine.pot));
+        p.setFont(QFont("Segoe UI", qMax(11, qRound(17 * s)), QFont::Bold));
+        int potY = height() / 2 - qRound(95 * s);
+        p.drawText(QRect(0, potY, width(), qRound(28 * s)), Qt::AlignCenter, QString("POT: $%1").arg(engine.pot));
 
-        int cardW = 80, cardH = 115;
-        int commStartX = width() / 2 - (5 * 90) / 2;
+        // Общие карты на столе (Flop, Turn, River)
+        int cardW = qRound(80 * s);
+        int cardH = qRound(115 * s);
+        int stepX = qRound(88 * s);
+        int commStartX = width() / 2 - (5 * stepX) / 2;
+        int commY = height() / 2 - cardH / 2;
 
         for (int i = 0; i < 5; ++i) {
-            QRect cRect(commStartX + i * 90, height() / 2 - 55, cardW, cardH);
-            if (i < engine.communityCards.size()) drawCard(p, cRect, &engine.communityCards[i], true);
-            else {
+            QRect cRect(commStartX + i * stepX, commY, cardW, cardH);
+            if (i < engine.communityCards.size()) {
+                drawCard(p, cRect, &engine.communityCards[i], true);
+            } else {
                 p.setPen(QPen(QColor(255, 255, 255, 40), 2, Qt::DashLine));
                 p.setBrush(Qt::NoBrush);
                 p.drawRoundedRect(cRect, 6, 6);
             }
         }
+
         drawPlayers(p, cardW, cardH);
     }
 
@@ -1158,76 +1191,99 @@ void PokerWidget::paintEvent(QPaintEvent*) {
 
 void PokerWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
     int numPlayers = engine.players.size();
-    QVector<QPoint> seatPos = getSeatPositions(numPlayers, width(), height(), 130, 100);
+    qreal s = getScale();
+
+    // Позиции мест с масштабированными отступами
+    int bottomOffset = qRound(115 * s);
+    int topOffset = qRound(80 * s);
+    QVector<QPoint> seatPos = getSeatPositions(numPlayers, width(), height(), bottomOffset, topOffset);
+
+    int boxW = qRound(170 * s);
+    int boxH = qRound(50 * s);
 
     for (int i = 0; i < numPlayers; ++i) {
         int displayIdx = (i - engine.myIdx + numPlayers) % numPlayers;
         QPoint pos = seatPos[displayIdx];
         auto& plr = engine.players[i];
 
+        // 1. Подсветка активного хода
         if (engine.currentTurnIdx == i && !engine.gameOver && !plr.hasFolded && !plr.isBankrupt && !plr.isDisconnected) {
-            p.setPen(QPen(QColor(59, 130, 246, 220), 4));
-            p.drawRoundedRect(pos.x() - 105, pos.y() - 55, 210, 70, 10, 10);
+            p.setPen(QPen(QColor(59, 130, 246, 220), qMax(2, qRound(3 * s))));
+            p.setBrush(Qt::NoBrush);
+            p.drawRoundedRect(pos.x() - boxW / 2 - 4, pos.y() - boxH / 2 - 4, boxW + 8, boxH + 8, 8, 8);
         }
 
+        // 2. Плашка игрока
         p.setBrush(QColor(15, 25, 35, 230));
         p.setPen(QPen(QColor(255, 255, 255, 40), 1));
-        p.drawRoundedRect(pos.x() - 100, pos.y() - 50, 200, 60, 8, 8);
+        p.drawRoundedRect(pos.x() - boxW / 2, pos.y() - boxH / 2, boxW, boxH, 6, 6);
 
+        // 3. Кнопка Дилера (D)
         if (engine.dealerIdx == i) {
+            int dSize = qRound(18 * s);
             p.setBrush(Qt::white);
-            p.setPen(QPen(QColor(0, 0, 0), 1));
-            p.drawEllipse(pos.x() - 115, pos.y() - 25, 22, 22);
+            p.setPen(QPen(Qt::black, 1));
+            p.drawEllipse(pos.x() - boxW / 2 - dSize / 2, pos.y() - dSize / 2, dSize, dSize);
             p.setPen(Qt::black);
-            p.setFont(QFont("Segoe UI", 12, QFont::Bold));
-            p.drawText(QRect(pos.x() - 115, pos.y() - 25, 22, 22), Qt::AlignCenter, "D");
+            p.setFont(QFont("Segoe UI", qMax(7, qRound(10 * s)), QFont::Bold));
+            p.drawText(QRect(pos.x() - boxW / 2 - dSize / 2, pos.y() - dSize / 2, dSize, dSize), Qt::AlignCenter, "D");
         }
 
+        // 4. Имя и аватар
         p.setPen(Qt::white);
-        p.setFont(QFont("Segoe UI", 12, QFont::Bold));
-
+        p.setFont(QFont("Segoe UI", qMax(8, qRound(11 * s)), QFont::Bold));
         QString nameWithAvatar = getAvatarEmojiById(plr.avatar) + " " + plr.name;
-        p.drawText(QRect(pos.x() - 90, pos.y() - 45, 180, 25), Qt::AlignLeft | Qt::AlignVCenter, nameWithAvatar);
+        p.drawText(QRect(pos.x() - boxW / 2 + 8, pos.y() - boxH / 2 + 3, boxW - 16, boxH / 2), Qt::AlignLeft | Qt::AlignVCenter, nameWithAvatar);
 
+        // 5. Подсказка комбинации (для локального игрока снизу)
         if (displayIdx == 0 && AppSettings::instance().showPokerHandHint && !plr.hasFolded && !plr.holeCards.isEmpty() && engine.phase != PREFLOP) {
             QVector<Card> allCards = plr.holeCards;
             allCards.append(engine.communityCards);
             HandValue hv = evaluate7Cards(allCards);
 
             p.setPen(QColor(251, 191, 36));
-            p.setFont(QFont("Segoe UI", 11, QFont::Bold));
-            p.drawText(QRect(pos.x() - 120, pos.y() + 15, 240, 25), Qt::AlignCenter, QString("[%1]").arg(hv.name));
+            p.setFont(QFont("Segoe UI", qMax(8, qRound(10 * s)), QFont::Bold));
+            p.drawText(QRect(pos.x() - boxW, pos.y() + boxH / 2 + 2, boxW * 2, qRound(20 * s)), Qt::AlignCenter, QString("[%1]").arg(hv.name));
         }
 
+        // 6. Баланс
         p.setPen(QColor(167, 243, 208));
-        p.drawText(QRect(pos.x() - 90, pos.y() - 20, 180, 25), Qt::AlignLeft | Qt::AlignVCenter, QString("$%1").arg(plr.balance));
+        p.setFont(QFont("Segoe UI", qMax(8, qRound(10 * s)), QFont::Bold));
+        p.drawText(QRect(pos.x() - boxW / 2 + 8, pos.y(), boxW - 16, boxH / 2), Qt::AlignLeft | Qt::AlignVCenter, QString("$%1").arg(plr.balance));
 
+        // 7. Текущая ставка
         if (plr.currentBet > 0) {
             p.setPen(QColor(253, 230, 138));
-            p.drawText(QRect(pos.x() - 90, pos.y() - 20, 180, 25), Qt::AlignRight | Qt::AlignVCenter, QString("Bet: %1").arg(plr.currentBet));
+            p.drawText(QRect(pos.x() - boxW / 2 + 8, pos.y(), boxW - 16, boxH / 2), Qt::AlignRight | Qt::AlignVCenter, QString("Bet: %1").arg(plr.currentBet));
         }
 
+        // 8. Статусы (FOLD, ALL-IN, DISCONNECTED)
+        p.setFont(QFont("Segoe UI", qMax(8, qRound(10 * s)), QFont::Bold));
         if (plr.isDisconnected) {
             p.setPen(QColor(107, 114, 128));
-            p.drawText(QRect(pos.x() - 90, pos.y() - 45, 180, 25), Qt::AlignRight | Qt::AlignVCenter, getLocalizedText("ОТКЛЮЧЕН", "OFFLINE"));
+            p.drawText(QRect(pos.x() - boxW / 2 + 8, pos.y() - boxH / 2 + 3, boxW - 16, boxH / 2), Qt::AlignRight | Qt::AlignVCenter, getLocalizedText("ВЫШЕЛ", "OFFLINE"));
         } else if (plr.isBankrupt) {
             p.setPen(QColor(156, 163, 175));
-            p.drawText(QRect(pos.x() - 90, pos.y() - 45, 180, 25), Qt::AlignRight | Qt::AlignVCenter, getLocalizedText("РАЗОРЁН", "BANKRUPT"));
+            p.drawText(QRect(pos.x() - boxW / 2 + 8, pos.y() - boxH / 2 + 3, boxW - 16, boxH / 2), Qt::AlignRight | Qt::AlignVCenter, getLocalizedText("РАЗОРЕН", "BANKRUPT"));
         } else if (plr.isAllIn) {
             p.setPen(QColor(248, 113, 113));
-            p.drawText(QRect(pos.x() - 90, pos.y() - 45, 180, 25), Qt::AlignRight | Qt::AlignVCenter, getLocalizedText("ALL-IN", "ALL-IN"));
+            p.drawText(QRect(pos.x() - boxW / 2 + 8, pos.y() - boxH / 2 + 3, boxW - 16, boxH / 2), Qt::AlignRight | Qt::AlignVCenter, getLocalizedText("ВА-БАНК", "ALL-IN"));
         } else if (plr.hasFolded) {
             p.setPen(QColor(156, 163, 175));
-            p.drawText(QRect(pos.x() - 90, pos.y() - 45, 180, 25), Qt::AlignRight | Qt::AlignVCenter, getLocalizedText("FOLD", "FOLD"));
+            p.drawText(QRect(pos.x() - boxW / 2 + 8, pos.y() - boxH / 2 + 3, boxW - 16, boxH / 2), Qt::AlignRight | Qt::AlignVCenter, getLocalizedText("СБРОС", "FOLD"));
         }
 
+        // 9. Карманные карты (Hole Cards)
         if (!plr.hasFolded && !plr.isBankrupt && !plr.isDisconnected) {
-            int cardsStartX = pos.x() - cardW + 10;
-            int cardsY = (displayIdx == 0) ? pos.y() - 170 : pos.y() + 25;
+            int cardGap = qRound(8 * s);
+            int totalHoleW = plr.holeCards.size() * cardW + (plr.holeCards.size() - 1) * cardGap;
+            int cardsStartX = pos.x() - totalHoleW / 2;
+            int cardsY = (displayIdx == 0) ? pos.y() - cardH - qRound(32 * s) : pos.y() + boxH / 2 + qRound(6 * s);
 
             for (int c = 0; c < plr.holeCards.size(); ++c) {
                 bool faceUp = (i == engine.myIdx || engine.phase == SHOWDOWN || engine.gameOver);
-                drawCard(p, QRect(cardsStartX + c * (cardW + 10), cardsY, cardW, cardH), &plr.holeCards[c], faceUp);
+                QRect cRect(cardsStartX + c * (cardW + cardGap), cardsY, cardW, cardH);
+                drawCard(p, cRect, &plr.holeCards[c], faceUp);
             }
         }
     }
@@ -1454,21 +1510,34 @@ void DurakWidget::broadcastNetState() {
 
 void DurakWidget::resizeEvent(QResizeEvent* ev) {
     BaseTableWidget::resizeEvent(ev);
-    btnPass->setGeometry(width() - 270, height() - 65, 120, 45);
-    btnTake->setGeometry(width() - 140, height() - 65, 120, 45);
+    qreal s = getScale();
+
+    int btnW = qRound(120 * s);
+    int btnH = qRound(45 * s);
+    int btnY = height() - btnH - qRound(18 * s);
+
+    btnPass->setGeometry(width() - btnW * 2 - qRound(25 * s), btnY, btnW, btnH);
+    btnTake->setGeometry(width() - btnW - qRound(15 * s), btnY, btnW, btnH);
+
+    QFont btnFont("Segoe UI", qMax(8, qRound(12 * s)), QFont::Bold);
+    btnPass->setFont(btnFont);
+    btnTake->setFont(btnFont);
 }
 
 void DurakWidget::mouseMoveEvent(QMouseEvent* ev) {
     if (engine.gameOver || engine.players.isEmpty() || engine.myIdx >= engine.players.size()) return;
     auto& myHand = engine.players[engine.myIdx].hand;
-    int cardW = 80, cardH = 115;
-    int handY = height() - 235;
-    int stepX = qMin(50, (width() - 300) / qMax(1, myHand.size()));
+    qreal s = getScale();
+
+    int cardW = qRound(80 * s);
+    int cardH = qRound(115 * s);
+    int handY = height() - cardH - qRound(110 * s);
+    int stepX = qMin(qRound(50 * s), (width() - qRound(300 * s)) / qMax<int>(1, myHand.size()));
     int startX = (width() - (myHand.size() * stepX + (cardW - stepX))) / 2;
 
     int newHovered = -1;
     for (int i = myHand.size() - 1; i >= 0; --i) {
-        int offsetY = (i == selectedHandCardIdx) ? -25 : ((i == hoveredHandCardIdx) ? -12 : 0);
+        int offsetY = (i == selectedHandCardIdx) ? qRound(-25 * s) : ((i == hoveredHandCardIdx) ? qRound(-12 * s) : 0);
         if (QRect(startX + i * stepX, handY + offsetY, cardW, cardH).contains(ev->pos())) {
             newHovered = i;
             break;
@@ -1484,13 +1553,16 @@ void DurakWidget::mouseMoveEvent(QMouseEvent* ev) {
 void DurakWidget::mousePressEvent(QMouseEvent* ev) {
     if (engine.gameOver || engine.players.isEmpty() || engine.myIdx >= engine.players.size()) return;
     auto& myHand = engine.players[engine.myIdx].hand;
-    int cardW = 80, cardH = 115;
-    int handY = height() - 235;
-    int stepX = qMin(50, (width() - 300) / qMax(1, myHand.size()));
+    qreal s = getScale();
+
+    int cardW = qRound(80 * s);
+    int cardH = qRound(115 * s);
+    int handY = height() - cardH - qRound(110 * s);
+    int stepX = qMin(qRound(50 * s), (width() - qRound(300 * s)) / qMax<int>(1, myHand.size()));
     int startX = (width() - (myHand.size() * stepX + (cardW - stepX))) / 2;
 
     for (int i = myHand.size() - 1; i >= 0; --i) {
-        int offsetY = (i == selectedHandCardIdx) ? -25 : ((i == hoveredHandCardIdx) ? -12 : 0);
+        int offsetY = (i == selectedHandCardIdx) ? qRound(-25 * s) : ((i == hoveredHandCardIdx) ? qRound(-12 * s) : 0);
         if (QRect(startX + i * stepX, handY + offsetY, cardW, cardH).contains(ev->pos())) {
             bool canAttack = (engine.attackerIdx == engine.myIdx) ||
             (engine.isDefenderTaking && engine.currentTurnIdx == engine.myIdx);
@@ -1544,11 +1616,12 @@ void DurakWidget::mousePressEvent(QMouseEvent* ev) {
     }
 
     if (selectedHandCardIdx != -1 && engine.defenderIdx == engine.myIdx && !engine.isDefenderTaking) {
-        int tableY = height() / 2 - 55;
-        int totalTableW = engine.table.size() * 110;
+        int tableY = height() / 2 - cardH / 2;
+        int stepTableX = qRound(110 * s);
+        int totalTableW = engine.table.size() * stepTableX;
         int tableStartX = (width() - totalTableW) / 2;
         for (int t = 0; t < engine.table.size(); ++t) {
-            if (QRect(tableStartX + t * 110, tableY, cardW, cardH).contains(ev->pos()) && !engine.table[t].isDefended) {
+            if (QRect(tableStartX + t * stepTableX, tableY, cardW, cardH).contains(ev->pos()) && !engine.table[t].isDefended) {
                 if (netManager && netManager->isNetworkGame && !netManager->isHost) {
                     QJsonObject json; json["act"] = "DEFEND"; json["cardHandIdx"] = selectedHandCardIdx; json["tableIdx"] = t;
                     netManager->sendJsonToServer(json);
@@ -1569,61 +1642,65 @@ void DurakWidget::mousePressEvent(QMouseEvent* ev) {
 void DurakWidget::paintEvent(QPaintEvent*) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-
     drawTableFelt(p);
 
+    qreal s = getScale();
+
     if (!engine.players.isEmpty()) {
-        int cardW = 80, cardH = 115;
+        int cardW = qRound(80 * s);
+        int cardH = qRound(115 * s);
 
         if (!engine.deck.isEmpty()) {
-            drawCard(p, QRect(15, 125, cardH, cardW), &engine.trumpCard, true);
-            drawCard(p, QRect(55, 95, cardW, cardH), nullptr, false);
+            drawCard(p, QRect(qRound(15 * s), qRound(125 * s), cardH, cardW), &engine.trumpCard, true);
+            drawCard(p, QRect(qRound(55 * s), qRound(95 * s), cardW, cardH), nullptr, false);
 
             p.setPen(Qt::white);
-            p.setFont(QFont("Segoe UI", 11, QFont::Bold));
-            p.drawText(35, 225, QString(getLocalizedText("Карт: %1", "Cards: %1")).arg(engine.deck.size()));
+            p.setFont(QFont("Segoe UI", qMax(8, qRound(11 * s)), QFont::Bold));
+            p.drawText(qRound(35 * s), qRound(225 * s), QString(getLocalizedText("Карт: %1", "Cards: %1")).arg(engine.deck.size()));
         } else {
             p.setPen(QColor(255, 235, 59));
-            p.setFont(QFont("Segoe UI", 13, QFont::Bold));
+            p.setFont(QFont("Segoe UI", qMax(9, qRound(13 * s)), QFont::Bold));
             static const QString suitsStr[] = { "♥", "♦", "♣", "♠" };
-            p.drawText(35, 120, QString(getLocalizedText("Козырь: %1", "Trump: %1")).arg(suitsStr[engine.trumpCard.suit]));
+            p.drawText(qRound(35 * s), qRound(120 * s), QString(getLocalizedText("Козырь: %1", "Trump: %1")).arg(suitsStr[engine.trumpCard.suit]));
         }
 
         if (engine.bitoCount > 0) {
             p.save();
-            p.translate(width() - 80, 150);
+            p.translate(width() - qRound(80 * s), qRound(150 * s));
             p.rotate(15);
             drawCard(p, QRect(-cardW / 2, -cardH / 2, cardW, cardH), nullptr, false);
             p.restore();
 
             p.setPen(Qt::white);
-            p.setFont(QFont("Segoe UI", 11, QFont::Bold));
-            p.drawText(width() - 110, 225, QString(getLocalizedText("Бито: %1", "Discards: %1")).arg(engine.bitoCount));
+            p.setFont(QFont("Segoe UI", qMax(8, qRound(11 * s)), QFont::Bold));
+            p.drawText(width() - qRound(110 * s), qRound(225 * s), QString(getLocalizedText("Бито: %1", "Discards: %1")).arg(engine.bitoCount));
         }
 
         drawPlayers(p, cardW, cardH);
 
-        int tableY = height() / 2 - 55;
-        int totalTableW = engine.table.size() * 110;
+        int tableY = height() / 2 - cardH / 2;
+        int stepX = qRound(110 * s);
+        int totalTableW = engine.table.size() * stepX;
         int tableStartX = (width() - totalTableW) / 2;
+
         for (int t = 0; t < engine.table.size(); ++t) {
-            int cardX = tableStartX + t * 110;
+            int cardX = tableStartX + t * stepX;
             drawCard(p, QRect(cardX, tableY, cardW, cardH), &engine.table[t].attack, true);
             if (engine.table[t].isDefended) {
-                drawCard(p, QRect(cardX + 22, tableY + 22, cardW, cardH), &engine.table[t].defend, true);
+                drawCard(p, QRect(cardX + qRound(22 * s), tableY + qRound(22 * s), cardW, cardH), &engine.table[t].defend, true);
             }
         }
 
         if (engine.myIdx < engine.players.size()) {
             auto& myHand = engine.players[engine.myIdx].hand;
-            int handY = height() - 235;
-            int stepX = qMin(50, (width() - 300) / qMax(1, myHand.size()));
-            int startX = (width() - (myHand.size() * stepX + (cardW - stepX))) / 2;
+            int handY = height() - cardH - qRound(110 * s);
+            int stepHandX = qMin(qRound(50 * s), (width() - qRound(300 * s)) / qMax<int>(1, myHand.size()));
+            int startX = (width() - (myHand.size() * stepHandX + (cardW - stepHandX))) / 2;
             for (int i = 0; i < myHand.size(); ++i) {
                 bool isSelected = (i == selectedHandCardIdx);
-                bool isHovered = (i == hoveredHandCardIdx);
-                int offsetY = isSelected ? -25 : (isHovered ? -12 : 0);
-                drawCard(p, QRect(startX + i * stepX, handY + offsetY, cardW, cardH), &myHand[i], true, isSelected);
+                bool isHovered  = (i == hoveredHandCardIdx);
+                int offsetY     = isSelected ? qRound(-25 * s) : (isHovered ? qRound(-12 * s) : 0);
+                drawCard(p, QRect(startX + i * stepHandX, handY + offsetY, cardW, cardH), &myHand[i], true, isSelected);
             }
         }
     }
@@ -1635,7 +1712,11 @@ void DurakWidget::paintEvent(QPaintEvent*) {
 
 void DurakWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
     int numPlayers = engine.players.size();
-    QVector<QPoint> seatPos = getSeatPositions(numPlayers, width(), height(), 75, 80);
+    qreal s = getScale();
+    QVector<QPoint> seatPos = getSeatPositions(numPlayers, width(), height(), qRound(75 * s), qRound(80 * s));
+
+    int boxW = qRound(160 * s);
+    int boxH = qRound(42 * s);
 
     for (int i = 0; i < numPlayers; ++i) {
         int displayIdx = (i - engine.myIdx + numPlayers) % numPlayers;
@@ -1643,25 +1724,28 @@ void DurakWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
         auto& opp = engine.players[i];
 
         if ((engine.attackerIdx == i || engine.defenderIdx == i) && !engine.gameOver) {
-            p.setPen(QPen(QColor(59, 130, 246, 220), 3));
+            p.setPen(QPen(QColor(59, 130, 246, 220), qMax(2, qRound(3 * s))));
             p.setBrush(Qt::NoBrush);
-            p.drawRoundedRect(pos.x() - 95, pos.y() - 30, 190, 50, 10, 10);
+            p.drawRoundedRect(pos.x() - boxW / 2 - 4, pos.y() - boxH / 2 - 4, boxW + 8, boxH + 8, 8, 8);
         }
 
         p.setBrush(QColor(15, 25, 35, 230));
         p.setPen(QPen(QColor(255, 255, 255, 40), 1));
-        p.drawRoundedRect(pos.x() - 90, pos.y() - 25, 180, 45, 8, 8);
+        p.drawRoundedRect(pos.x() - boxW / 2, pos.y() - boxH / 2, boxW, boxH, 6, 6);
 
         p.setPen(Qt::white);
-        p.setFont(QFont("Segoe UI", 11, QFont::Bold));
+        p.setFont(QFont("Segoe UI", qMax(8, qRound(11 * s)), QFont::Bold));
         QString nameWithAvatar = getAvatarEmojiById(opp.avatar) + " " + opp.name;
-        p.drawText(QRect(pos.x() - 80, pos.y() - 20, 160, 35), Qt::AlignCenter, nameWithAvatar);
+        p.drawText(QRect(pos.x() - boxW / 2, pos.y() - boxH / 2, boxW, boxH), Qt::AlignCenter, nameWithAvatar);
 
         if (displayIdx != 0) {
             int handSize = opp.hand.size();
-            int startX = pos.x() - (handSize * 15 + (cardW - 15)) / 2;
+            int oppStep = qRound(15 * s);
+            int oppW = cardW - qRound(25 * s);
+            int oppH = cardH - qRound(35 * s);
+            int startX = pos.x() - (handSize * oppStep + (oppW - oppStep)) / 2;
             for (int c = 0; c < handSize; ++c) {
-                drawCard(p, QRect(startX + c * 15, pos.y() + 25, cardW - 25, cardH - 35), nullptr, false);
+                drawCard(p, QRect(startX + c * oppStep, pos.y() + boxH / 2 + qRound(5 * s), oppW, oppH), nullptr, false);
             }
         }
     }
@@ -1673,7 +1757,7 @@ void DurakWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
 
 KozelWidget::KozelWidget(NetworkManager* netMgr, QWidget* parent) : BaseTableWidget(parent), netManager(netMgr) {
     btnPlayCards = new QPushButton(getLocalizedText("СДЕЛАТЬ ХОД", "PLAY CARDS"), this);
-    btnPlayCards->setStyleSheet("QPushButton { background: #10B981; color: white; font-weight: bold; border-radius: 6px; padding: 10px; font-size: 14px; }");
+    btnPlayCards->setStyleSheet("QPushButton { background: #10B981; color: white; font-weight: bold; border-radius: 6px; padding: 6px; }");
     btnPlayCards->setCursor(Qt::PointingHandCursor);
     btnPlayCards->hide();
 
@@ -1825,20 +1909,28 @@ void KozelWidget::broadcastNetState() {
 
 void KozelWidget::resizeEvent(QResizeEvent* ev) {
     BaseTableWidget::resizeEvent(ev);
-    btnPlayCards->setGeometry(width() - 180, height() - 65, 150, 45);
+    qreal s = getScale();
+
+    int btnW = qRound(150 * s);
+    int btnH = qRound(45 * s);
+    btnPlayCards->setGeometry(width() - btnW - qRound(20 * s), height() - btnH - qRound(18 * s), btnW, btnH);
+    btnPlayCards->setFont(QFont("Segoe UI", qMax(8, qRound(13 * s)), QFont::Bold));
 }
 
 void KozelWidget::mouseMoveEvent(QMouseEvent* ev) {
     if (engine.gameOver || engine.players.isEmpty() || engine.myIdx >= engine.players.size()) return;
     auto& myHand = engine.players[engine.myIdx].hand;
-    int cardW = 80, cardH = 115;
-    int handY = height() - 235;
-    int stepX = qMin(60, (width() - 300) / qMax(1, myHand.size()));
+    qreal s = getScale();
+
+    int cardW = qRound(80 * s);
+    int cardH = qRound(115 * s);
+    int handY = height() - cardH - qRound(110 * s);
+    int stepX = qMin(qRound(60 * s), (width() - qRound(300 * s)) / qMax<int>(1, myHand.size()));
     int startX = (width() - (myHand.size() * stepX + (cardW - stepX))) / 2;
 
     int newHovered = -1;
     for (int i = myHand.size() - 1; i >= 0; --i) {
-        int offsetY = selectedHandCardIndices.contains(i) ? -25 : ((i == hoveredHandCardIdx) ? -12 : 0);
+        int offsetY = selectedHandCardIndices.contains(i) ? qRound(-25 * s) : ((i == hoveredHandCardIdx) ? qRound(-12 * s) : 0);
         if (QRect(startX + i * stepX, handY + offsetY, cardW, cardH).contains(ev->pos())) {
             newHovered = i;
             break;
@@ -1854,13 +1946,16 @@ void KozelWidget::mouseMoveEvent(QMouseEvent* ev) {
 void KozelWidget::mousePressEvent(QMouseEvent* ev) {
     if (engine.gameOver || engine.players.isEmpty() || engine.currentTurnIdx != engine.myIdx) return;
     auto& myHand = engine.players[engine.myIdx].hand;
-    int cardW = 80, cardH = 115;
-    int handY = height() - 235;
-    int stepX = qMin(60, (width() - 300) / qMax(1, myHand.size()));
+    qreal s = getScale();
+
+    int cardW = qRound(80 * s);
+    int cardH = qRound(115 * s);
+    int handY = height() - cardH - qRound(110 * s);
+    int stepX = qMin(qRound(60 * s), (width() - qRound(300 * s)) / qMax<int>(1, myHand.size()));
     int startX = (width() - (myHand.size() * stepX + (cardW - stepX))) / 2;
 
     for (int i = myHand.size() - 1; i >= 0; --i) {
-        int offsetY = selectedHandCardIndices.contains(i) ? -25 : ((i == hoveredHandCardIdx) ? -12 : 0);
+        int offsetY = selectedHandCardIndices.contains(i) ? qRound(-25 * s) : ((i == hoveredHandCardIdx) ? qRound(-12 * s) : 0);
         if (QRect(startX + i * stepX, handY + offsetY, cardW, cardH).contains(ev->pos())) {
             if (selectedHandCardIndices.contains(i)) {
                 if (!selectedHandCardIndices.isEmpty()) {
@@ -1892,33 +1987,37 @@ void KozelWidget::mousePressEvent(QMouseEvent* ev) {
 void KozelWidget::paintEvent(QPaintEvent*) {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-
     drawTableFelt(p);
 
+    qreal s = getScale();
+
     if (!engine.players.isEmpty()) {
-        int cardW = 80, cardH = 115;
+        int cardW = qRound(80 * s);
+        int cardH = qRound(115 * s);
+
         p.setPen(QColor(255, 215, 0));
-        p.setFont(QFont("Segoe UI", 14, QFont::Bold));
+        p.setFont(QFont("Segoe UI", qMax(9, qRound(14 * s)), QFont::Bold));
         static const QString suitsStr[] = { "♥", "♦", "♣", "♠" };
-        p.drawText(35, 80, QString(getLocalizedText("Козырь: %1", "Trump: %1")).arg(suitsStr[engine.trumpSuit]));
+        p.drawText(qRound(35 * s), qRound(80 * s), QString(getLocalizedText("Козырь: %1", "Trump: %1")).arg(suitsStr[engine.trumpSuit]));
 
         drawPlayers(p, cardW, cardH);
 
-        int trickStartX = width() / 2 - (engine.currentTrick.size() * 45) / 2;
+        int trickStep = qRound(45 * s);
+        int trickStartX = width() / 2 - (engine.currentTrick.size() * trickStep) / 2;
         for (int t = 0; t < engine.currentTrick.size(); ++t) {
-            drawCard(p, QRect(trickStartX + t * 45, height() / 2 - 55, cardW, cardH), &engine.currentTrick[t].second, true);
+            drawCard(p, QRect(trickStartX + t * trickStep, height() / 2 - cardH / 2, cardW, cardH), &engine.currentTrick[t].second, true);
         }
 
         if (engine.myIdx < engine.players.size()) {
             auto& myHand = engine.players[engine.myIdx].hand;
-            int handY = height() - 235;
-            int stepX = qMin(60, (width() - 300) / qMax(1, myHand.size()));
-            int startX = (width() - (myHand.size() * stepX + (cardW - stepX))) / 2;
+            int handY = height() - cardH - qRound(110 * s);
+            int stepHandX = qMin(qRound(60 * s), (width() - qRound(300 * s)) / qMax<int>(1, myHand.size()));
+            int startX = (width() - (myHand.size() * stepHandX + (cardW - stepHandX))) / 2;
             for (int i = 0; i < myHand.size(); ++i) {
                 bool isSelected = selectedHandCardIndices.contains(i);
                 bool isHovered  = (i == hoveredHandCardIdx);
-                int offsetY     = isSelected ? -25 : (isHovered ? -12 : 0);
-                drawCard(p, QRect(startX + i * stepX, handY + offsetY, cardW, cardH), &myHand[i], true, isSelected);
+                int offsetY     = isSelected ? qRound(-25 * s) : (isHovered ? qRound(-12 * s) : 0);
+                drawCard(p, QRect(startX + i * stepHandX, handY + offsetY, cardW, cardH), &myHand[i], true, isSelected);
             }
         }
     }
@@ -1930,7 +2029,11 @@ void KozelWidget::paintEvent(QPaintEvent*) {
 
 void KozelWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
     int numPlayers = engine.players.size();
-    QVector<QPoint> seatPos = getSeatPositions(numPlayers, width(), height(), 75, 80);
+    qreal s = getScale();
+    QVector<QPoint> seatPos = getSeatPositions(numPlayers, width(), height(), qRound(75 * s), qRound(80 * s));
+
+    int boxW = qRound(150 * s);
+    int boxH = qRound(45 * s);
 
     for (int i = 0; i < numPlayers; ++i) {
         int displayIdx = (i - engine.myIdx + numPlayers) % numPlayers;
@@ -1938,36 +2041,31 @@ void KozelWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
         auto& plr = engine.players[i];
 
         if (engine.currentTurnIdx == i && !engine.gameOver) {
-            p.setPen(QPen(QColor(59, 130, 246, 220), 3));
+            p.setPen(QPen(QColor(59, 130, 246, 220), qMax(2, qRound(3 * s))));
             p.setBrush(Qt::NoBrush);
-            p.drawRoundedRect(pos.x() - 80, pos.y() - 30, 160, 50, 10, 10);
+            p.drawRoundedRect(pos.x() - boxW / 2 - 4, pos.y() - boxH / 2 - 4, boxW + 8, boxH + 8, 8, 8);
         }
 
         p.setBrush(QColor(15, 25, 35, 230));
         p.setPen(QPen(QColor(255, 255, 255, 40), 1));
-        p.drawRoundedRect(pos.x() - 75, pos.y() - 25, 150, 45, 8, 8);
+        p.drawRoundedRect(pos.x() - boxW / 2, pos.y() - boxH / 2, boxW, boxH, 6, 6);
 
         p.setPen(Qt::white);
-        p.setFont(QFont("Segoe UI", 11, QFont::Bold));
+        p.setFont(QFont("Segoe UI", qMax(8, qRound(11 * s)), QFont::Bold));
         QString nameWithAvatar = getAvatarEmojiById(plr.avatar) + " " + plr.name;
-        p.drawText(QRect(pos.x() - 70, pos.y() - 20, 140, 20), Qt::AlignLeft, nameWithAvatar);
+        p.drawText(QRect(pos.x() - boxW / 2 + 6, pos.y() - boxH / 2 + 3, boxW - 12, boxH / 2), Qt::AlignLeft, nameWithAvatar);
 
         p.setPen(QColor(167, 243, 208));
-        p.drawText(QRect(pos.x() - 70, pos.y() - 0, 140, 20), Qt::AlignLeft, QString(getLocalizedText("Очки: %1", "Points: %1")).arg(plr.pointsCollected));
-
-        if (plr.pointsCollected > 0) {
-            p.save();
-            p.translate(pos.x() + 65, pos.y() - 10);
-            p.rotate(10);
-            drawCard(p, QRect(-20, -25, 40, 55), nullptr, false);
-            p.restore();
-        }
+        p.drawText(QRect(pos.x() - boxW / 2 + 6, pos.y(), boxW - 12, boxH / 2), Qt::AlignLeft, QString(getLocalizedText("Очки: %1", "Points: %1")).arg(plr.pointsCollected));
 
         if (displayIdx != 0) {
             int handSize = plr.hand.size();
-            int startX = pos.x() - (handSize * 15 + (cardW - 15)) / 2;
+            int oppStep = qRound(15 * s);
+            int oppW = cardW - qRound(25 * s);
+            int oppH = cardH - qRound(35 * s);
+            int startX = pos.x() - (handSize * oppStep + (oppW - oppStep)) / 2;
             for (int c = 0; c < handSize; ++c) {
-                drawCard(p, QRect(startX + c * 15, pos.y() + 25, cardW - 25, cardH - 35), nullptr, false);
+                drawCard(p, QRect(startX + c * oppStep, pos.y() + boxH / 2 + qRound(5 * s), oppW, oppH), nullptr, false);
             }
         }
     }
@@ -1983,10 +2081,10 @@ UnoWidget::UnoWidget(NetworkManager* netMgr, QWidget* parent) : BaseTableWidget(
     btnUno      = new QPushButton(getLocalizedText("🔥 УНО!", "🔥 UNO!"), this);
     btnCatchUno = new QPushButton(getLocalizedText("⚡ ПОЙМАТЬ УНО!", "⚡ CATCH UNO!"), this);
 
-    btnDrawCard->setStyleSheet("QPushButton { background: #2563EB; color: white; font-weight: bold; border-radius: 8px; padding: 10px; font-size: 14px; } QPushButton:hover { background: #3B82F6; }");
-    btnPass->setStyleSheet("QPushButton { background: #64748B; color: white; font-weight: bold; border-radius: 8px; padding: 10px; font-size: 14px; } QPushButton:hover { background: #94A3B8; }");
-    btnUno->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #DC2626, stop:1 #F59E0B); color: white; font-weight: 900; font-size: 15px; border-radius: 8px; border: 2px solid #FDE047; padding: 8px; } QPushButton:hover { background: #EF4444; }");
-    btnCatchUno->setStyleSheet("QPushButton { background: #D97706; color: white; font-weight: bold; font-size: 13px; border-radius: 8px; border: 1px solid #FCD34D; padding: 8px; } QPushButton:hover { background: #F59E0B; }");
+    btnDrawCard->setStyleSheet("QPushButton { background: #2563EB; color: white; font-weight: bold; border-radius: 8px; padding: 6px; } QPushButton:hover { background: #3B82F6; }");
+    btnPass->setStyleSheet("QPushButton { background: #64748B; color: white; font-weight: bold; border-radius: 8px; padding: 6px; } QPushButton:hover { background: #94A3B8; }");
+    btnUno->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #DC2626, stop:1 #F59E0B); color: white; font-weight: 900; border-radius: 8px; border: 2px solid #FDE047; padding: 6px; } QPushButton:hover { background: #EF4444; }");
+    btnCatchUno->setStyleSheet("QPushButton { background: #D97706; color: white; font-weight: bold; border-radius: 8px; border: 1px solid #FCD34D; padding: 6px; } QPushButton:hover { background: #F59E0B; }");
 
     btnDrawCard->setCursor(Qt::PointingHandCursor);
     btnPass->setCursor(Qt::PointingHandCursor);
@@ -2152,8 +2250,10 @@ void UnoWidget::updateUI() {
 
     if (engine.accumulatedPenalty > 0) {
         btnDrawCard->setText(QString(getLocalizedText("ВЗЯТЬ ШТРАФ (+%1)", "TAKE PENALTY (+%1)")).arg(engine.accumulatedPenalty));
-        // Кнопка штрафа видна только если нечем ответить (+2 / +4)
-        btnDrawCard->setVisible(isMyTurn && !hasMove);
+        // // Кнопка штрафа видна только если нечем ответить (+2 / +4)
+        // btnDrawCard->setVisible(isMyTurn && !hasMove);
+        // Кнопка штрафа всегда
+        btnDrawCard->setVisible(isMyTurn);
         btnPass->setVisible(false);
     } else {
         btnDrawCard->setText(getLocalizedText("ВЗЯТЬ КАРТУ", "DRAW CARD"));
@@ -2199,8 +2299,17 @@ void UnoWidget::updateUI() {
         lblStatus->setText(engine.statusMessage);
         colorPickerWidget->hide();
     } else {
-        lblStatus->setText(engine.statusMessage);
+        static const QString colNames[] = { getLocalizedText("Красный", "Red"), getLocalizedText("Жёлтый", "Yellow"), getLocalizedText("Зелёный", "Green"), getLocalizedText("Синий", "Blue") };
+        QString colorTxt = colNames[engine.currentColor];
+        QString penaltySuffix = (engine.accumulatedPenalty > 0) ? QString(getLocalizedText(" [ШТРАФ: +%1]", " [PENALTY: +%1]")).arg(engine.accumulatedPenalty) : "";
+
+        if (engine.currentTurnIdx == engine.myIdx) {
+            lblStatus->setText(QString(getLocalizedText("Ваш ход! Цвет: %1%2", "Your turn! Color: %1%2")).arg(colorTxt, penaltySuffix));
+        } else if (engine.currentTurnIdx >= 0 && engine.currentTurnIdx < engine.players.size()) {
+            lblStatus->setText(QString(getLocalizedText("Ход игрока %1 (Цвет: %2)%3", "%1's turn (Color: %2)%3")).arg(engine.players[engine.currentTurnIdx].name, colorTxt, penaltySuffix));
+        }
     }
+
     update();
 }
 
@@ -2249,20 +2358,63 @@ void UnoWidget::broadcastNetState() {
 
 void UnoWidget::resizeEvent(QResizeEvent* ev) {
     BaseTableWidget::resizeEvent(ev);
-    btnDrawCard->setGeometry(width() - 180, height() - 65, 150, 45);
-    btnPass->setGeometry(width() - 180, height() - 65, 150, 45);
-    btnUno->setGeometry(width() - 320, height() - 65, 130, 45);
-    btnCatchUno->setGeometry(width() - 320, height() - 65, 130, 45);
-    colorPickerWidget->setGeometry(width() / 2 - 125, height() - 110, 250, 48);
+    qreal s = getScale();
 
-    drawDeckRect = QRect(30, 100, 80, 115);
+    int btnW = qRound(140 * s);
+    int btnH = qRound(44 * s);
+    int unoW = qRound(130 * s);
+    int btnY = height() - btnH - qRound(18 * s);
+
+    btnDrawCard->setGeometry(width() - btnW - qRound(20 * s), btnY, btnW, btnH);
+    btnPass->setGeometry(width() - btnW - qRound(20 * s), btnY, btnW, btnH);
+    btnUno->setGeometry(width() - btnW - unoW - qRound(30 * s), btnY, unoW, btnH);
+    btnCatchUno->setGeometry(width() - btnW - unoW - qRound(30 * s), btnY, unoW, btnH);
+
+    QFont btnFont("Segoe UI", qMax(8, qRound(12 * s)), QFont::Bold);
+    btnDrawCard->setFont(btnFont);
+    btnPass->setFont(btnFont);
+    btnUno->setFont(btnFont);
+    btnCatchUno->setFont(btnFont);
+
+    int cpW = qRound(240 * s);
+    int cpH = qRound(46 * s);
+    colorPickerWidget->setGeometry(width() / 2 - cpW / 2, height() - cpH - qRound(55 * s), cpW, cpH);
+    colorPickerWidget->setStyleSheet(QString(
+        "background: rgba(15, 23, 42, 0.95); "
+        "border-radius: %1px; "
+        "border: 2px solid rgba(251, 191, 36, 0.6);"
+    ).arg(cpH / 2));
+
+    int circleSize = qRound(32 * s);
+    int circleRadius = circleSize / 2;
+
+    const QString colStyles[] = { "#DC2626", "#EAB308", "#16A34A", "#2563EB" };
+    QList<QPushButton*> colorButtons = colorPickerWidget->findChildren<QPushButton*>();
+    for (int i = 0; i < colorButtons.size(); ++i) {
+        auto* btn = colorButtons[i];
+        btn->setFixedSize(circleSize, circleSize);
+        if (i < 4) {
+            btn->setStyleSheet(QString(
+                "QPushButton { background: %1; border-radius: %2px; border: 2px solid white; } "
+                "QPushButton:hover { border: 3px solid #FDE047; }"
+            ).arg(colStyles[i]).arg(circleRadius));
+        } else {
+            // Кнопка отмены "X"
+            btn->setFont(QFont("Segoe UI", qMax(8, qRound(13 * s)), QFont::Bold));
+            btn->setStyleSheet(QString(
+                "QPushButton { background: #991B1B; color: white; font-weight: bold; border-radius: %1px; border: 2px solid #F87171; } "
+                "QPushButton:hover { background: #DC2626; }"
+            ).arg(circleRadius));
+        }
+    }
+
+    drawDeckRect = QRect(qRound(30 * s), qRound(100 * s), qRound(80 * s), qRound(115 * s));
 }
 
 void UnoWidget::drawUnoCard(QPainter& p, const QRect& rect, const UnoCard* card, bool faceUp, bool selected) {
     p.save();
     p.setRenderHint(QPainter::Antialiasing);
 
-    // Тень под картой
     p.setPen(Qt::NoPen);
     p.setBrush(QColor(0, 0, 0, 120));
     p.drawRoundedRect(rect.translated(3, 4), 8, 8);
@@ -2270,9 +2422,6 @@ void UnoWidget::drawUnoCard(QPainter& p, const QRect& rect, const UnoCard* card,
     QPainterPath path;
     path.addRoundedRect(rect, 8, 8);
 
-    // =========================================================================
-    // РУБАШКА КАРТЫ
-    // =========================================================================
     if (!faceUp || !card) {
         QColor shirtBg;
         switch (AppSettings::instance().cardShirt) {
@@ -2303,7 +2452,8 @@ void UnoWidget::drawUnoCard(QPainter& p, const QRect& rect, const UnoCard* card,
         p.translate(rect.center());
         p.rotate(-14);
 
-        QFont unoFont("Arial Black", 15, QFont::Black);
+        int backUnoFont = qMax(8, qRound(rect.height() * 0.16));
+        QFont unoFont("Arial Black", backUnoFont, QFont::Black);
         unoFont.setItalic(true);
         p.setFont(unoFont);
 
@@ -2320,9 +2470,6 @@ void UnoWidget::drawUnoCard(QPainter& p, const QRect& rect, const UnoCard* card,
         return;
     }
 
-    // =========================================================================
-    // ЛИЦЕВАЯ СТОРОНА КАРТЫ
-    // =========================================================================
     QColor cardBg;
     switch (card->color) {
         case UnoRed:    cardBg = QColor(220, 38, 38); break;
@@ -2346,25 +2493,22 @@ void UnoWidget::drawUnoCard(QPainter& p, const QRect& rect, const UnoCard* card,
     if (card->color == UnoWild) {
         p.setPen(Qt::NoPen);
 
-        // Верхняя половина (Красный слева, Синий справа)
         p.save();
         p.setClipRect(QRectF(rect.left(), rect.top(), rect.width(), rect.height() / 2.0));
         p.translate(rect.center());
         p.rotate(34);
-        p.setBrush(QColor(220, 38, 38)); p.drawPie(ovalRect, 90 * 16, 180 * 16);  // Лево: Красный
-        p.setBrush(QColor(37, 99, 235));  p.drawPie(ovalRect, -90 * 16, 180 * 16); // Право: Синий
+        p.setBrush(QColor(220, 38, 38)); p.drawPie(ovalRect, 90 * 16, 180 * 16);
+        p.setBrush(QColor(37, 99, 235));  p.drawPie(ovalRect, -90 * 16, 180 * 16);
         p.restore();
 
-        // Нижняя половина (Жёлтый слева, Зелёный справа)
         p.save();
         p.setClipRect(QRectF(rect.left(), rect.center().y(), rect.width(), rect.height() / 2.0));
         p.translate(rect.center());
         p.rotate(34);
-        p.setBrush(QColor(234, 179, 8));  p.drawPie(ovalRect, 90 * 16, 180 * 16);  // Лево: Жёлтый
-        p.setBrush(QColor(22, 163, 74));  p.drawPie(ovalRect, -90 * 16, 180 * 16); // Право: Зелёный
+        p.setBrush(QColor(234, 179, 8));  p.drawPie(ovalRect, 90 * 16, 180 * 16);
+        p.setBrush(QColor(22, 163, 74));  p.drawPie(ovalRect, -90 * 16, 180 * 16);
         p.restore();
 
-        // Белая окантовка поверх
         p.save();
         p.translate(rect.center());
         p.rotate(34);
@@ -2382,10 +2526,11 @@ void UnoWidget::drawUnoCard(QPainter& p, const QRect& rect, const UnoCard* card,
         p.restore();
     }
 
-    // 2. Центральный символ (под углом 0°)
+    // 2. Центральный символ (пропорционально масштабируемый шрифт)
     if (card->color == UnoWild) {
         if (card->value == UnoWildDrawFour) {
-            QFont centerFont("Arial Black", 26, QFont::Black);
+            int wild4Font = qMax(12, qRound(rect.height() * 0.26));
+            QFont centerFont("Arial Black", wild4Font, QFont::Black);
             centerFont.setItalic(true);
             p.setFont(centerFont);
             p.setPen(QColor(0, 0, 0, 100));
@@ -2400,7 +2545,8 @@ void UnoWidget::drawUnoCard(QPainter& p, const QRect& rect, const UnoCard* card,
         else if (card->value == UnoReverse) centerTxt = "⇄";
         else if (card->value == UnoDrawTwo) centerTxt = "+2";
 
-        QFont centerFont("Arial Black", centerTxt.length() > 1 ? 22 : 30, QFont::Black);
+        int centerFontSize = qMax(10, qRound(rect.height() * (centerTxt.length() > 1 ? 0.22 : 0.30)));
+        QFont centerFont("Arial Black", centerFontSize, QFont::Black);
         centerFont.setItalic(true);
         p.setFont(centerFont);
 
@@ -2413,42 +2559,43 @@ void UnoWidget::drawUnoCard(QPainter& p, const QRect& rect, const UnoCard* card,
 
     p.restore(); // Сброс clipPath
 
-    // 3. Угловые индексы (для Wild — мини 4-цветные овалы с горизонтальным разделением)
-    auto drawMiniWildOval = [&](const QPointF& pt) {
-        QRectF miniRect(-4.5, -7.5, 9, 15);
-        p.setPen(Qt::NoPen);
-
-        // Верхняя половина
-        p.save();
-        p.setClipRect(QRectF(pt.x() - 10, pt.y() - 10, 20, 10));
-        p.translate(pt);
-        p.rotate(34);
-        p.setBrush(QColor(220, 38, 38)); p.drawPie(miniRect, 90 * 16, 180 * 16);
-        p.setBrush(QColor(37, 99, 235));  p.drawPie(miniRect, -90 * 16, 180 * 16);
-        p.restore();
-
-        // Нижняя половина
-        p.save();
-        p.setClipRect(QRectF(pt.x() - 10, pt.y(), 20, 10));
-        p.translate(pt);
-        p.rotate(34);
-        p.setBrush(QColor(234, 179, 8));  p.drawPie(miniRect, 90 * 16, 180 * 16);
-        p.setBrush(QColor(22, 163, 74));  p.drawPie(miniRect, -90 * 16, 180 * 16);
-        p.restore();
-
-        // Окантовка
-        p.save();
-        p.translate(pt);
-        p.rotate(34);
-        p.setPen(QPen(Qt::white, 1.2));
-        p.setBrush(Qt::NoBrush);
-        p.drawEllipse(miniRect);
-        p.restore();
-    };
+    // 3. Угловые индексы (пропорционально масштабируемые)
+    int cornerFontSize = qMax(7, qRound(rect.height() * 0.11));
 
     if (card->color == UnoWild && card->value == UnoWildCard) {
-        drawMiniWildOval(QPointF(rect.left() + 10, rect.top() + 13));
-        drawMiniWildOval(QPointF(rect.right() - 10, rect.bottom() - 13));
+        auto drawMiniWildOval = [&](const QPointF& pt) {
+            qreal mw = rect.width() * 0.11;
+            qreal mh = rect.height() * 0.13;
+            QRectF miniRect(-mw / 2.0, -mh / 2.0, mw, mh);
+            p.setPen(Qt::NoPen);
+
+            p.save();
+            p.setClipRect(QRectF(pt.x() - mw, pt.y() - mh, mw * 2, mh));
+            p.translate(pt);
+            p.rotate(34);
+            p.setBrush(QColor(220, 38, 38)); p.drawPie(miniRect, 90 * 16, 180 * 16);
+            p.setBrush(QColor(37, 99, 235));  p.drawPie(miniRect, -90 * 16, 180 * 16);
+            p.restore();
+
+            p.save();
+            p.setClipRect(QRectF(pt.x() - mw, pt.y(), mw * 2, mh));
+            p.translate(pt);
+            p.rotate(34);
+            p.setBrush(QColor(234, 179, 8));  p.drawPie(miniRect, 90 * 16, 180 * 16);
+            p.setBrush(QColor(22, 163, 74));  p.drawPie(miniRect, -90 * 16, 180 * 16);
+            p.restore();
+
+            p.save();
+            p.translate(pt);
+            p.rotate(34);
+            p.setPen(QPen(Qt::white, 1.2));
+            p.setBrush(Qt::NoBrush);
+            p.drawEllipse(miniRect);
+            p.restore();
+        };
+
+        drawMiniWildOval(QPointF(rect.left() + rect.width() * 0.14, rect.top() + rect.height() * 0.13));
+        drawMiniWildOval(QPointF(rect.right() - rect.width() * 0.14, rect.bottom() - rect.height() * 0.13));
     } else {
         QString cornerTxt;
         if (card->value <= UnoNine) cornerTxt = QString::number(card->value);
@@ -2457,25 +2604,23 @@ void UnoWidget::drawUnoCard(QPainter& p, const QRect& rect, const UnoCard* card,
         else if (card->value == UnoDrawTwo) cornerTxt = "+2";
         else if (card->value == UnoWildDrawFour) cornerTxt = "+4";
 
-        QFont cornerFont("Arial Black", 10, QFont::Bold);
+        QFont cornerFont("Arial Black", cornerFontSize, QFont::Bold);
         cornerFont.setItalic(true);
         p.setFont(cornerFont);
 
-        // Верхний левый
         p.setPen(QColor(0, 0, 0, 100));
-        p.drawText(rect.adjusted(6, 4, -4, -4), Qt::AlignTop | Qt::AlignLeft, cornerTxt);
+        p.drawText(rect.adjusted(5, 3, -3, -3), Qt::AlignTop | Qt::AlignLeft, cornerTxt);
         p.setPen(Qt::white);
-        p.drawText(rect.adjusted(5, 3, -4, -4), Qt::AlignTop | Qt::AlignLeft, cornerTxt);
+        p.drawText(rect.adjusted(4, 2, -3, -3), Qt::AlignTop | Qt::AlignLeft, cornerTxt);
 
-        // Нижний правый
         p.save();
         p.translate(rect.center());
         p.rotate(180);
         QRectF localRect(-rect.width() / 2.0, -rect.height() / 2.0, rect.width(), rect.height());
         p.setPen(QColor(0, 0, 0, 100));
-        p.drawText(localRect.adjusted(6, 4, -4, -4), Qt::AlignTop | Qt::AlignLeft, cornerTxt);
+        p.drawText(localRect.adjusted(5, 3, -3, -3), Qt::AlignTop | Qt::AlignLeft, cornerTxt);
         p.setPen(Qt::white);
-        p.drawText(localRect.adjusted(5, 3, -4, -4), Qt::AlignTop | Qt::AlignLeft, cornerTxt);
+        p.drawText(localRect.adjusted(4, 2, -3, -3), Qt::AlignTop | Qt::AlignLeft, cornerTxt);
         p.restore();
     }
 
@@ -2485,14 +2630,17 @@ void UnoWidget::drawUnoCard(QPainter& p, const QRect& rect, const UnoCard* card,
 void UnoWidget::mouseMoveEvent(QMouseEvent* ev) {
     if (engine.gameOver || engine.players.isEmpty() || engine.myIdx >= engine.players.size()) return;
     auto& myHand = engine.players[engine.myIdx].hand;
-    int cardW = 80, cardH = 115;
-    int handY = height() - 235;
-    int stepX = qMin(50, (width() - 300) / qMax(1, myHand.size()));
+    qreal s = getScale();
+
+    int cardW = qRound(80 * s);
+    int cardH = qRound(115 * s);
+    int handY = height() - cardH - qRound(110 * s);
+    int stepX = qMin(qRound(50 * s), (width() - qRound(300 * s)) / qMax<int>(1, myHand.size()));
     int startX = (width() - (myHand.size() * stepX + (cardW - stepX))) / 2;
 
     int newHovered = -1;
     for (int i = myHand.size() - 1; i >= 0; --i) {
-        int offsetY = (i == selectedHandCardIdx) ? -25 : ((i == hoveredHandCardIdx) ? -12 : 0);
+        int offsetY = (i == selectedHandCardIdx) ? qRound(-25 * s) : ((i == hoveredHandCardIdx) ? qRound(-12 * s) : 0);
         if (QRect(startX + i * stepX, handY + offsetY, cardW, cardH).contains(ev->pos())) {
             newHovered = i;
             break;
@@ -2521,15 +2669,18 @@ void UnoWidget::mousePressEvent(QMouseEvent* ev) {
     if (engine.currentTurnIdx != engine.myIdx) return;
 
     auto& myHand = engine.players[engine.myIdx].hand;
-    int cardW = 80, cardH = 115;
-    int handY = height() - 235;
-    int stepX = qMin(50, (width() - 300) / qMax(1, myHand.size()));
+    qreal s = getScale();
+
+    int cardW = qRound(80 * s);
+    int cardH = qRound(115 * s);
+    int handY = height() - cardH - qRound(110 * s);
+    int stepX = qMin(qRound(50 * s), (width() - qRound(300 * s)) / qMax<int>(1, myHand.size()));
     int startX = (width() - (myHand.size() * stepX + (cardW - stepX))) / 2;
 
     bool clickedOnCard = false;
 
     for (int i = myHand.size() - 1; i >= 0; --i) {
-        int offsetY = (i == selectedHandCardIdx) ? -25 : ((i == hoveredHandCardIdx) ? -12 : 0);
+        int offsetY = (i == selectedHandCardIdx) ? qRound(-25 * s) : ((i == hoveredHandCardIdx) ? qRound(-12 * s) : 0);
         if (QRect(startX + i * stepX, handY + offsetY, cardW, cardH).contains(ev->pos())) {
             clickedOnCard = true;
             if (!engine.canPlayCard(myHand[i])) return;
@@ -2561,7 +2712,6 @@ void UnoWidget::mousePressEvent(QMouseEvent* ev) {
         }
     }
 
-    // Клик мимо карт сбрасывает меню выбора цвета
     if (!clickedOnCard && colorPickerWidget->isVisible() && !colorPickerWidget->geometry().contains(ev->pos())) {
         colorPickerWidget->hide();
         selectedHandCardIdx = -1;
@@ -2574,43 +2724,41 @@ void UnoWidget::paintEvent(QPaintEvent*) {
     p.setRenderHint(QPainter::Antialiasing);
     drawTableFelt(p);
 
-    if (!engine.players.isEmpty()) {
-        int cardW = 80, cardH = 115;
+    qreal s = getScale();
 
-        // --- 1. КОЛОДА ВВЕРХУ СЛЕВА (КАК В ДУРАКЕ) ---
-        int deckX = 30;
-        int deckY = 100;
+    if (!engine.players.isEmpty()) {
+        int cardW = qRound(80 * s);
+        int cardH = qRound(115 * s);
+
+        int deckX = qRound(30 * s);
+        int deckY = qRound(100 * s);
         drawDeckRect = QRect(deckX, deckY, cardW, cardH);
 
         if (engine.deck.size() > 1) drawUnoCard(p, QRect(deckX + 4, deckY + 4, cardW, cardH), nullptr, false);
         if (engine.deck.size() > 5) drawUnoCard(p, QRect(deckX + 2, deckY + 2, cardW, cardH), nullptr, false);
         drawUnoCard(p, drawDeckRect, nullptr, false);
 
-        QRect badgeRect(deckX - 5, deckY + cardH + 8, cardW + 10, 22);
+        QRect badgeRect(deckX - 5, deckY + cardH + qRound(8 * s), cardW + 10, qRound(22 * s));
         p.setBrush(QColor(15, 23, 42, 220));
         p.setPen(QPen(QColor(251, 191, 36, 180), 1));
         p.drawRoundedRect(badgeRect, 6, 6);
-        p.setFont(QFont("Segoe UI", 10, QFont::Bold));
+        p.setFont(QFont("Segoe UI", qMax(8, qRound(10 * s)), QFont::Bold));
         p.setPen(Qt::white);
         p.drawText(badgeRect, Qt::AlignCenter, QString(getLocalizedText("Карт: %1", "Cards: %1")).arg(engine.deck.size()));
 
-        // --- 2. СБРОС И СТРЕЛКИ НАПРАВЛЕНИЯ В ЦЕНТРЕ ---
         drawCenterDiscard(p, cardW, cardH);
-
-        // --- 3. ИГРОКИ ---
         drawPlayers(p, cardW, cardH);
 
-        // --- 4. РУКА ИГРОКА ---
         if (engine.myIdx < engine.players.size()) {
             auto& myHand = engine.players[engine.myIdx].hand;
-            int handY = height() - 235;
-            int stepX = qMin(50, (width() - 300) / qMax(1, myHand.size()));
-            int startX = (width() - (myHand.size() * stepX + (cardW - stepX))) / 2;
+            int handY = height() - cardH - qRound(110 * s);
+            int stepHandX = qMin(qRound(50 * s), (width() - qRound(300 * s)) / qMax<int>(1, myHand.size()));
+            int startX = (width() - (myHand.size() * stepHandX + (cardW - stepHandX))) / 2;
             for (int i = 0; i < myHand.size(); ++i) {
                 bool isSelected = (i == selectedHandCardIdx);
                 bool isHovered  = (i == hoveredHandCardIdx);
-                int offsetY     = isSelected ? -25 : (isHovered ? -12 : 0);
-                drawUnoCard(p, QRect(startX + i * stepX, handY + offsetY, cardW, cardH), &myHand[i], true, isSelected);
+                int offsetY     = isSelected ? qRound(-25 * s) : (isHovered ? qRound(-12 * s) : 0);
+                drawUnoCard(p, QRect(startX + i * stepHandX, handY + offsetY, cardW, cardH), &myHand[i], true, isSelected);
             }
         }
     }
@@ -2621,15 +2769,14 @@ void UnoWidget::paintEvent(QPaintEvent*) {
 }
 
 void UnoWidget::drawCenterDiscard(QPainter& p, int cardW, int cardH) {
-    QPoint center(width() / 2, height() / 2 - 25);
+    qreal s = getScale();
+    QPoint center(width() / 2, height() / 2 - qRound(25 * s));
 
-    // Цвет активной масти для стрелок
     const QColor arrowColors[] = { QColor(220, 38, 38), QColor(234, 179, 8), QColor(22, 163, 74), QColor(37, 99, 235) };
     QColor curCol = arrowColors[engine.currentColor];
 
-    // Круговые стрелки направления вокруг сброса
-    int arrowRadius = 110;
-    p.setPen(QPen(QColor(curCol.red(), curCol.green(), curCol.blue(), 70), 3, Qt::DashLine));
+    int arrowRadius = qRound(105 * s);
+    p.setPen(QPen(QColor(curCol.red(), curCol.green(), curCol.blue(), 70), qMax(2, qRound(3 * s)), Qt::DashLine));
     p.setBrush(Qt::NoBrush);
     p.drawEllipse(center, arrowRadius, arrowRadius);
 
@@ -2640,17 +2787,17 @@ void UnoWidget::drawCenterDiscard(QPainter& p, int cardW, int cardH) {
 
     for (int a = 0; a < 360; a += 180) {
         p.save();
-        p.rotate(a + arrowAnimAngle); // Позиция стрелок динамически сдвигается
+        p.rotate(a + arrowAnimAngle);
         p.translate(0, -arrowRadius);
         QPolygonF arrow;
-        if (engine.direction == 1) arrow << QPointF(-9, -7) << QPointF(9, 0) << QPointF(-9, 7);
-        else                       arrow << QPointF(9, -7) << QPointF(-9, 0) << QPointF(9, 7);
+        qreal aS = s * 9.0;
+        if (engine.direction == 1) arrow << QPointF(-aS, -aS * 0.8) << QPointF(aS, 0) << QPointF(-aS, aS * 0.8);
+        else                       arrow << QPointF(aS, -aS * 0.8) << QPointF(-aS, 0) << QPointF(aS, aS * 0.8);
         p.drawPolygon(arrow);
         p.restore();
     }
     p.restore();
 
-    // Сброс в самом центре
     int discardX = center.x() - cardW / 2;
     int discardY = center.y() - cardH / 2;
 
@@ -2669,7 +2816,11 @@ void UnoWidget::drawCenterDiscard(QPainter& p, int cardW, int cardH) {
 
 void UnoWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
     int numPlayers = engine.players.size();
-    QVector<QPoint> seatPos = getSeatPositions(numPlayers, width(), height(), 75, 80);
+    qreal s = getScale();
+    QVector<QPoint> seatPos = getSeatPositions(numPlayers, width(), height(), qRound(75 * s), qRound(80 * s));
+
+    int boxW = qRound(150 * s);
+    int boxH = qRound(42 * s);
 
     for (int i = 0; i < numPlayers; ++i) {
         int displayIdx = (i - engine.myIdx + numPlayers) % numPlayers;
@@ -2677,39 +2828,39 @@ void UnoWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
         auto& opp = engine.players[i];
         int handSize = opp.hand.size();
 
-        // 1. Подсветка активного хода
         if (engine.currentTurnIdx == i && !engine.gameOver) {
-            p.setPen(QPen(QColor(59, 130, 246, 220), 3));
+            p.setPen(QPen(QColor(59, 130, 246, 220), qMax(2, qRound(3 * s))));
             p.setBrush(Qt::NoBrush);
-            p.drawRoundedRect(pos.x() - 85, pos.y() - 28, 170, 48, 10, 10);
+            p.drawRoundedRect(pos.x() - boxW / 2 - 4, pos.y() - boxH / 2 - 4, boxW + 8, boxH + 8, 8, 8);
         }
 
-        // 2. Плашка с именем и аватаром
         p.setBrush(QColor(15, 25, 35, 230));
         p.setPen(QPen(QColor(255, 255, 255, 40), 1));
-        p.drawRoundedRect(pos.x() - 80, pos.y() - 24, 160, 42, 8, 8);
+        p.drawRoundedRect(pos.x() - boxW / 2, pos.y() - boxH / 2, boxW, boxH, 6, 6);
 
         p.setPen(Qt::white);
-        p.setFont(QFont("Segoe UI", 11, QFont::Bold));
+        p.setFont(QFont("Segoe UI", qMax(8, qRound(11 * s)), QFont::Bold));
         QString nameWithAvatar = getAvatarEmojiById(opp.avatar) + " " + opp.name;
-        p.drawText(QRect(pos.x() - 75, pos.y() - 24, 150, 42), Qt::AlignVCenter | Qt::AlignLeft, nameWithAvatar);
+        p.drawText(QRect(pos.x() - boxW / 2 + 5, pos.y() - boxH / 2, boxW - 10, boxH), Qt::AlignVCenter | Qt::AlignLeft, nameWithAvatar);
 
-        // 3. Бейдж количества карт / Индикатор UNO! (рисуется ДЛЯ ВСЕХ игроков)
-        QRect badgeRect(pos.x() + 88, pos.y() - 24, 42, 42);
+        int badgeSize = qRound(38 * s);
+        QRect badgeRect(pos.x() + boxW / 2 + qRound(5 * s), pos.y() - badgeSize / 2, badgeSize, badgeSize);
         bool isUno = (handSize == 1);
         p.setBrush(isUno ? QColor(220, 38, 38) : QColor(30, 41, 59, 240));
         p.setPen(QPen(isUno ? QColor(254, 240, 138) : QColor(255, 255, 255, 60), isUno ? 2 : 1));
         p.drawRoundedRect(badgeRect, 6, 6);
 
-        p.setFont(QFont("Segoe UI", isUno ? 9 : 11, QFont::Bold));
+        p.setFont(QFont("Segoe UI", qMax(8, qRound((isUno ? 9 : 11) * s)), QFont::Bold));
         p.setPen(Qt::white);
         p.drawText(badgeRect, Qt::AlignCenter, isUno ? "UNO!" : QString("x%1").arg(handSize));
 
-        // 4. Веер закрытых карт (только для соперников)
         if (displayIdx != 0) {
-            int startX = pos.x() - (handSize * 15 + (cardW - 15)) / 2;
+            int oppStep = qRound(15 * s);
+            int oppW = cardW - qRound(25 * s);
+            int oppH = cardH - qRound(35 * s);
+            int startX = pos.x() - (handSize * oppStep + (oppW - oppStep)) / 2;
             for (int c = 0; c < handSize; ++c) {
-                drawUnoCard(p, QRect(startX + c * 15, pos.y() + 25, cardW - 25, cardH - 35), nullptr, false);
+                drawUnoCard(p, QRect(startX + c * oppStep, pos.y() + boxH / 2 + qRound(5 * s), oppW, oppH), nullptr, false);
             }
         }
     }
@@ -2721,11 +2872,11 @@ void UnoWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setWindowTitle(getLocalizedText("Royal Card Club Collection", "Royal Card Club Collection"));
-#if defined(Q_OS_IOS)
+#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
     showFullScreen();
 #else
-    resize(1050, 750);
-    setMinimumSize(950, 680);
+    resize(1280, 720);
+    setMinimumSize(640, 360);
 #endif
 
     auto* f11Shortcut = new QShortcut(QKeySequence(Qt::Key_F11), this);

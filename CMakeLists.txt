@@ -105,6 +105,13 @@ if(WIN32)
     endif()
 else()
     # --- Настройки для Linux и macOS ---
+    # --- Исправление бага Qt на macOS ---
+    if(APPLE AND NOT IOS AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT TARGET WrapOpenGL::WrapOpenGL)
+        find_package(OpenGL REQUIRED)
+        add_library(WrapOpenGL::WrapOpenGL INTERFACE IMPORTED)
+        target_link_libraries(WrapOpenGL::WrapOpenGL INTERFACE OpenGL::GL)
+    endif()
+
     find_package(Qt6 REQUIRED COMPONENTS Widgets Network Multimedia)
 endif()
 
@@ -139,20 +146,42 @@ if(WIN32)
 
     # Финализация (обязательна для Qt6 на Windows)
     qt_finalize_executable(${EXE_NAME})
-else()
-    if(IOS)
-        # --- Сборка под iOS ---
-        add_executable(${EXE_NAME} MACOSX_BUNDLE ${SOURCES})
 
-        set_target_properties(${EXE_NAME} PROPERTIES
-            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/assets/ios/Info.plist.in
-            MACOSX_BUNDLE_BUNDLE_NAME "Royal Card Club"
-            MACOSX_BUNDLE_GUI_IDENTIFIER "com.arta48.rcc"
-            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.arta48.rcc"
-            XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
-            XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "15.0"
-        )
-    elseif(APPLE)
+elseif(IOS)
+    # --- Сборка под iOS ---
+    set(IOS_ICON assets/icon.png)
+    set(IOS_STORYBOARD assets/ios/LaunchScreen.storyboard)
+    set_source_files_properties(${IOS_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    set_source_files_properties(${IOS_STORYBOARD} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+
+    add_executable(${EXE_NAME} MACOSX_BUNDLE ${SOURCES} ${IOS_ICON} ${IOS_STORYBOARD})
+
+    set_target_properties(${EXE_NAME} PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/assets/ios/Info.plist.in
+        MACOSX_BUNDLE_ICON_FILE icon.png
+        MACOSX_BUNDLE_BUNDLE_NAME "Royal Card Club"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.arta48.rcc"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.arta48.rcc"
+        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+        XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "16.0"
+        QT_IOS_LAUNCH_SCREEN "${CMAKE_CURRENT_SOURCE_DIR}/assets/ios/LaunchScreen.storyboard"
+    )
+
+    # Исключаем FFmpeg и принудительно используем нативный медиа-плагин Apple AVFoundation
+    qt_import_plugins(${EXE_NAME}
+        INCLUDE Qt6::QDarwinMediaPlugin
+        EXCLUDE Qt6::QFFmpegMediaPlugin
+    )
+
+    target_link_libraries(${EXE_NAME} PRIVATE
+        Qt6::Widgets
+        Qt6::Network
+        Qt6::Multimedia
+        "-framework AVFoundation"
+        "-framework AudioToolbox"
+    )
+else()
+    if(APPLE)
         # --- Настройки для macOS ---
         # На macOS собираем как Bundle для генерации .app директории
         set(MACOSX_ICON assets/macos/icon.icns)

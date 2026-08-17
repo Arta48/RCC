@@ -48,6 +48,12 @@ public:
     explicit BaseTableWidget(QWidget* parent = nullptr);
     ~BaseTableWidget() override = default;
 
+    qreal getScale() const {
+        qreal scaleW = width() / 1280.0;
+        qreal scaleH = height() / 720.0;
+        return std::clamp(std::min(scaleW, scaleH), 0.45, 2.5);
+    }
+
 protected:
     void drawTableFelt(QPainter& p);
     void drawGameOverBanner(QPainter& p, const QString& message);
@@ -63,6 +69,15 @@ protected:
 class MainMenuWidget : public QWidget {
     Q_OBJECT
 public:
+    QLabel*      lblTitle;
+    QLabel*      lblSub;
+    QLabel*      lblSelectHeader;
+    QLabel*      lblSingleHeader;
+    QLabel*      lblOpponents;
+    QLabel*      lblMultiHeader;
+    QFrame*      selectFrame;
+    QFrame*      botFrame;
+    QFrame*      netFrame;
     QComboBox*   comboGameType;
     QComboBox*   comboBots;
     QPushButton* btnStartBotGame;
@@ -76,6 +91,7 @@ public:
 
 protected:
     void paintEvent(QPaintEvent* ev) override;
+    void resizeEvent(QResizeEvent* ev) override;
 };
 
 /**

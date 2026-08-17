@@ -146,16 +146,19 @@ jobs:
       - name: Install Qt6
         uses: jurplel/install-qt-action@v3
         with:
-          version: '6.6.0'
+          version: '6.8.2'
+          target: 'desktop'
+          modules: 'qtmultimedia'
 
       - name: Configure and Build (Universal Binary)
         run: |
-          # Собираем универсальный бинарник (x86_64 + arm64) с поддержкой систем от macOS 11.0
+          # Собираем универсальный бинарник (x86_64 + arm64) с поддержкой систем от macOS 12.0
           cmake -B build-macos \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
             -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET="11.0"
-          cmake --build build-macos -j2
+            -DCMAKE_OSX_DEPLOYMENT_TARGET="12.0"
+          cmake --build build-macos -j$(sysctl -n hw.ncpu)
 
       - name: Deploy dependencies into App Bundle
         run: |
@@ -193,18 +196,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Qt6 for iOS
-        uses: jurplel/install-qt-action@v3
+      - name: Install Qt6 Host (macOS)
+        uses: jurplel/install-qt-action@v4
         with:
-          version: '6.6.0'
+          version: '6.8.2'
+          target: 'desktop'
+          modules: 'qtmultimedia'
+
+      - name: Install Qt6 for iOS
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.2'
           target: 'ios'
+          modules: 'qtmultimedia'
 
       - name: Configure and Build IPA
         run: |
+          QT_HOST_DIR=$(find "$RUNNER_WORKSPACE/Qt" -type d -name "macos" | head -n 1)
+          QT_IOS_DIR=$(find "$RUNNER_WORKSPACE/Qt" -type d -name "ios" | head -n 1)
+
           cmake -B build-ios -G Xcode \
+            -DCMAKE_TOOLCHAIN_FILE="$QT_IOS_DIR/lib/cmake/Qt6/qt.toolchain.cmake" \
+            -DQT_HOST_PATH="$QT_HOST_DIR" \
             -DCMAKE_SYSTEM_NAME=iOS \
             -DCMAKE_OSX_SYSROOT=iphoneos \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0
 
           cd build-ios
           xcodebuild -target RCC -configuration Release -sdk iphoneos \
@@ -212,16 +228,26 @@ jobs:
 
           mkdir -p ipa_root/Payload
           cp -R Release-iphoneos/*.app ipa_root/Payload/
+
+          # Нарезаем точные размеры иконок под iPhone и iPad
+          APP_DIR=$(find ipa_root/Payload -name "*.app" | head -n 1)
+          sips -z 180 180 ../assets/icon.png --out "$APP_DIR/AppIcon60x60@3x.png"
+          sips -z 120 120 ../assets/icon.png --out "$APP_DIR/AppIcon60x60@2x.png"
+          sips -z 152 152 ../assets/icon.png --out "$APP_DIR/AppIcon76x76@2x~ipad.png"
+
           cd ipa_root
           zip -qr ../RCC.ipa Payload
           cd ..
           rm -rf ipa_root
 
+          cd ..
+          cp build-ios/RCC.ipa .
+
       - name: Upload iOS Artifact
         uses: actions/upload-artifact@v4
         with:
           name: RCC-iOS
-          path: build-ios/RCC.ipa
+          path: RCC.ipa
 
   # ==========================================
   # 6. АВТОМАТИЧЕСКАЯ ПУБЛИКАЦИЯ РЕЛИЗА

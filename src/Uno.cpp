@@ -440,15 +440,14 @@ bool UnoEngine::makeAiMove() {
 
 void UnoEngine::updateStatus() {
     if (gameOver) return;
-    static const QString colNamesRu[] = { "Красный", "Жёлтый", "Зелёный", "Синий" };
-    static const QString colNamesEn[] = { "Red", "Yellow", "Green", "Blue" };
-    QString colorTxt = (QLocale::system().language() == QLocale::Russian) ? colNamesRu[currentColor] : colNamesEn[currentColor];
+    static const QString colNames[] = { getLocalizedText("Красный", "Red"), getLocalizedText("Жёлтый", "Yellow"), getLocalizedText("Зелёный", "Green"), getLocalizedText("Синий", "Blue") };
+    QString colorTxt = colNames[currentColor];
 
     QString penaltySuffix = (accumulatedPenalty > 0) ? QString(getLocalizedText(" [ШТРАФ: +%1]", " [PENALTY: +%1]")).arg(accumulatedPenalty) : "";
 
-    if (currentTurnIdx == 0) {
+    if (currentTurnIdx == myIdx) {
         statusMessage = QString(getLocalizedText("Ваш ход! Цвет: %1%2", "Your turn! Color: %1%2")).arg(colorTxt, penaltySuffix);
-    } else {
+    } else if (currentTurnIdx >= 0 && currentTurnIdx < players.size()) {
         statusMessage = QString(getLocalizedText("Ход игрока %1 (Цвет: %2)%3", "%1's turn (Color: %2)%3")).arg(players[currentTurnIdx].name, colorTxt, penaltySuffix);
     }
 }
