@@ -2,15 +2,12 @@ name: Build and Release
 
 on:
   push:
-    # branches: [ main ]
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
-  # pull_request:
-  #   branches: [ main ]
 
 env:
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true' # Полностью скрывает предупреждения об устаревании Node.js 20
-  HOMEBREW_NO_AUTO_UPDATE: '1'                    # Скрывает предупреждения brew и ускоряет запуск шага macOS
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
+  HOMEBREW_NO_AUTO_UPDATE: '1'
   HOMEBREW_NO_INSTALL_CLEANUP: '1'
 
 permissions:
@@ -18,7 +15,7 @@ permissions:
 
 jobs:
   # ==========================================
-  # 1. СБОРКА И УПАКОВКА ПОД LINUX (PORTABLE ZIP)
+  # 1. LINUX (PORTABLE ZIP)
   # ==========================================
   build-linux:
     runs-on: ubuntu-latest
@@ -31,10 +28,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential cmake qt6-base-dev qt6-multimedia-dev libgl1-mesa-dev zip
 
-      - name: Configure and Build
-        run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
-          cmake --build build -j$(nproc)
+      - name: Run compile.sh
+        run: bash compile.sh
 
       - name: Package Portable ZIP
         run: |
@@ -49,7 +44,7 @@ jobs:
           path: RCC-Linux.zip
 
   # ==========================================
-  # 2. СБОРКА НАТИВНОГО ПАКЕТА ДЛЯ ARCH LINUX
+  # 2. ARCH LINUX (PKG.TAR.ZST)
   # ==========================================
   build-arch:
     runs-on: ubuntu-latest
@@ -64,16 +59,14 @@ jobs:
 
       - name: Patch and Run setup_arch_package.sh
         run: |
-          # Создаем изолированного пользователя builder для makepkg
           useradd -m builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
           chown -R builder:builder .
 
-          # Отключаем установку пакета (-i) и копируем ТОЛЬКО основной пакет (без debug) в корень перед очисткой
-          sed -i 's/makepkg -si/makepkg -s/g' setup_arch_package.sh
-          sed -i 's/cd .. \&\& rm -rf rcc_pkg/cp rcc-[0-9]*.pkg.tar.zst ..\/RCC.pkg.tar.zst \&\& cd .. \&\& rm -rf rcc_pkg/g' setup_arch_package.sh
+          # На CI отключаем установку (-i) и забираем собранный архив пакета
+          sed -i 's|makepkg -si|makepkg -s|g' setup_arch_package.sh
+          sed -i 's|cd .. \&\& rm -rf rcc_pkg|cp rcc-[0-9]*.pkg.tar.zst ..\/RCC.pkg.tar.zst \&\& cd .. \&\& rm -rf rcc_pkg|g' setup_arch_package.sh
 
-          # Запуск сборки от пользователя builder
           su builder -c "bash setup_arch_package.sh"
 
       - name: Upload Arch Artifact
@@ -83,7 +76,7 @@ jobs:
           path: RCC.pkg.tar.zst
 
   # ==========================================
-  # 3. СТАТИЧЕСКАЯ СБОРКА ПОД WINDOWS (PORTABLE ZIP)
+  # 3. WINDOWS (STATIC ZIP)
   # ==========================================
   build-windows:
     runs-on: windows-latest
@@ -116,10 +109,8 @@ jobs:
             mingw-w64-x86_64-libtiff
             mingw-w64-x86_64-vulkan-headers
 
-      - name: Configure and Build
-        run: |
-          cmake -S . -B build-windows -G "MinGW Makefiles"
-          cmake --build build-windows -j2
+      - name: Run compile_windows.sh
+        run: bash compile_windows.sh
 
       - name: Package Windows ZIP (PowerShell)
         shell: powershell
@@ -135,7 +126,7 @@ jobs:
           path: RCC-Windows.zip
 
   # ==========================================
-  # 4. СБОРКА ПОД MACOS (PORTABLE & INSTALLER)
+  # 4. MACOS (DMG)
   # ==========================================
   build-macos:
     runs-on: macos-latest
@@ -143,43 +134,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Qt6
+      - name: Install Qt6 & create-dmg
         uses: jurplel/install-qt-action@v3
         with:
           version: '6.8.2'
           target: 'desktop'
           modules: 'qtmultimedia'
 
-      - name: Configure and Build (Universal Binary)
-        run: |
-          # Собираем универсальный бинарник (x86_64 + arm64) с поддержкой систем от macOS 12.0
-          cmake -B build-macos \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
-            -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET="12.0"
-          cmake --build build-macos -j$(sysctl -n hw.ncpu)
+      - name: Install create-dmg
+        run: brew install create-dmg
 
-      - name: Deploy dependencies into App Bundle
-        run: |
-          macdeployqt "build-macos/Royal Card Club.app"
-
-      - name: Create Drag-and-Drop Installer DMG
-        run: |
-          brew install create-dmg
-          mkdir dmg_root
-          cp -R "build-macos/Royal Card Club.app" dmg_root/
-
-          create-dmg \
-            --volname "RCC Installer" \
-            --window-pos 200 120 \
-            --window-size 600 450 \
-            --icon-size 100 \
-            --icon "Royal Card Club.app" 150 150 \
-            --hide-extension "Royal Card Club.app" \
-            --app-drop-link 450 150 \
-            RCC.dmg \
-            dmg_root/
+      - name: Run compile_macos.sh
+        run: bash compile_macos.sh
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
@@ -188,7 +154,7 @@ jobs:
           path: RCC.dmg
 
   # ==========================================
-  # 5. СБОРКА ПОД IOS (IPA)
+  # 5. IOS (IPA)
   # ==========================================
   build-ios:
     runs-on: macos-latest
@@ -210,38 +176,8 @@ jobs:
           target: 'ios'
           modules: 'qtmultimedia'
 
-      - name: Configure and Build IPA
-        run: |
-          QT_HOST_DIR=$(find "$RUNNER_WORKSPACE/Qt" -type d -name "macos" | head -n 1)
-          QT_IOS_DIR=$(find "$RUNNER_WORKSPACE/Qt" -type d -name "ios" | head -n 1)
-
-          cmake -B build-ios -G Xcode \
-            -DCMAKE_TOOLCHAIN_FILE="$QT_IOS_DIR/lib/cmake/Qt6/qt.toolchain.cmake" \
-            -DQT_HOST_PATH="$QT_HOST_DIR" \
-            -DCMAKE_SYSTEM_NAME=iOS \
-            -DCMAKE_OSX_SYSROOT=iphoneos \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0
-
-          cd build-ios
-          xcodebuild -target RCC -configuration Release -sdk iphoneos \
-            CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
-
-          mkdir -p ipa_root/Payload
-          cp -R Release-iphoneos/*.app ipa_root/Payload/
-
-          # Нарезаем точные размеры иконок под iPhone и iPad
-          APP_DIR=$(find ipa_root/Payload -name "*.app" | head -n 1)
-          sips -z 180 180 ../assets/icon.png --out "$APP_DIR/AppIcon60x60@3x.png"
-          sips -z 120 120 ../assets/icon.png --out "$APP_DIR/AppIcon60x60@2x.png"
-          sips -z 152 152 ../assets/icon.png --out "$APP_DIR/AppIcon76x76@2x~ipad.png"
-
-          cd ipa_root
-          zip -qr ../RCC.ipa Payload
-          cd ..
-          rm -rf ipa_root
-
-          cd ..
-          cp build-ios/RCC.ipa .
+      - name: Run compile_ios.sh
+        run: bash compile_ios.sh
 
       - name: Upload iOS Artifact
         uses: actions/upload-artifact@v4
@@ -250,7 +186,7 @@ jobs:
           path: RCC.ipa
 
   # ==========================================
-  # 6. СБОРКА ПОД ANDROID (APK)
+  # 6. ANDROID (SIGNED APK)
   # ==========================================
   build-android:
     runs-on: ubuntu-latest
@@ -267,11 +203,6 @@ jobs:
       - name: Install Ninja
         run: sudo apt-get update && sudo apt-get install -y ninja-build
 
-      - name: Prepare Android Resources
-        run: |
-          mkdir -p assets/android/res/drawable
-          cp assets/icon.png assets/android/res/drawable/icon.png
-
       - name: Install Qt6 for Android (ARM64)
         uses: jurplel/install-qt-action@v4
         with:
@@ -280,24 +211,8 @@ jobs:
           arch: 'android_arm64_v8a'
           modules: 'qtmultimedia'
 
-      - name: Configure and Build APK
-        run: |
-          QT_ANDROID_DIR=$(find "$RUNNER_WORKSPACE/Qt" -maxdepth 3 -type d -name "android_arm64_v8a" | head -n 1)
-
-          "$QT_ANDROID_DIR/bin/qt-cmake" -B build-android -GNinja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DQT_ANDROID_ABIS="arm64-v8a" \
-            -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \
-            -DANDROID_NDK_ROOT="$ANDROID_NDK_LATEST_HOME"
-
-          cmake --build build-android
-
-          keytool -genkey -v -keystore release.keystore -alias rcc_key -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=RoyalCardClub,O=Arta48,C=RU"
-
-          RAW_APK=$(find build-android -name "*.apk" | head -n 1)
-          APKSIGNER=$(find "$ANDROID_SDK_ROOT/build-tools" -name "apksigner" | sort -V | tail -n 1)
-
-          "$APKSIGNER" sign --ks release.keystore --ks-pass pass:android --ks-key-alias rcc_key --key-pass pass:android --out RCC.apk "$RAW_APK"
+      - name: Run compile_android.sh
+        run: bash compile_android.sh
 
       - name: Upload Android Artifact
         uses: actions/upload-artifact@v4
@@ -306,7 +221,7 @@ jobs:
           path: RCC.apk
 
   # ==========================================
-  # 7. АВТОМАТИЧЕСКАЯ ПУБЛИКАЦИЯ РЕЛИЗА
+  # 7. PUBLISH RELEASE
   # ==========================================
   publish-release:
     needs: [build-linux, build-arch, build-windows, build-macos, build-ios, build-android]

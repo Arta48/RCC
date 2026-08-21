@@ -13,7 +13,7 @@
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     // Установка заголовка окна в зависимости от локали
-    setWindowTitle(getLocalizedText("Royal Card Club Collection", "Royal Card Club Collection"));
+    setWindowTitle(getLocalizedText("Royal Card Club", "Royal Card Club"));
 
     #if !defined(Q_OS_IOS) && !defined(Q_OS_ANDROID)
     // Базовые габариты для десктопных платформ (Windows, Linux, macOS)

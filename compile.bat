@@ -27,7 +27,7 @@ rmdir /s /q build-windows
 mkdir build-windows
 
 REM 2. Конфигурация и сборка через CMake
-cmake -S . -B build-windows -G "MinGW Makefiles"
+cmake -S . -B build-windows -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
 cmake --build build-windows -j %NUMBER_OF_PROCESSORS%
 
 REM 3. Уведомление
