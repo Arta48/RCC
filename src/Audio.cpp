@@ -36,24 +36,18 @@ void AudioManager::initEffects() {
     };
 
     for (const auto& item : mappings) {
-        auto* player = new QMediaPlayer(this);
-        auto* audioOutput = new QAudioOutput(this);
-
-        player->setAudioOutput(audioOutput);
-        player->setSource(QUrl(item.path));
-        audioOutput->setVolume(m_sfxVolume);
-
-        m_effects.insert(item.type, { player, audioOutput });
+        auto* effect = new QSoundEffect(this);
+        effect->setSource(QUrl(item.path));
+        effect->setVolume(m_sfxVolume);
+        m_effects.insert(item.type, { effect });
     }
 }
 
 void AudioManager::playSound(SoundEffect effect) {
     if (m_sfxMuted) return;
 
-    if (m_effects.contains(effect)) {
-        auto& sfx = m_effects[effect];
-        sfx.player->setPosition(0);
-        sfx.player->play();
+    if (m_effects.contains(effect) && m_effects[effect].effect) {
+        m_effects[effect].effect->play();
     }
 }
 
@@ -67,6 +61,18 @@ void AudioManager::stopMusic() {
     m_bgPlayer->stop();
 }
 
+void AudioManager::pauseMusic() {
+    if (m_bgPlayer && m_bgPlayer->playbackState() == QMediaPlayer::PlayingState) {
+        m_bgPlayer->pause();
+    }
+}
+
+void AudioManager::resumeMusic() {
+    if (!m_musicMuted && m_bgPlayer && m_bgPlayer->playbackState() == QMediaPlayer::PausedState) {
+        m_bgPlayer->play();
+    }
+}
+
 void AudioManager::setMusicVolume(float volume) {
     m_musicVolume = qBound(0.0f, volume, 1.0f);
     if (!m_musicMuted) {
@@ -77,7 +83,7 @@ void AudioManager::setMusicVolume(float volume) {
 void AudioManager::setSfxVolume(float volume) {
     m_sfxVolume = qBound(0.0f, volume, 1.0f);
     for (auto& sfx : m_effects) {
-        sfx.audioOutput->setVolume(m_sfxVolume);
+        if (sfx.effect) sfx.effect->setVolume(m_sfxVolume);
     }
 }
 

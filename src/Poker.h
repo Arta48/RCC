@@ -13,7 +13,6 @@ namespace PokerConfig {
     constexpr int DEFAULT_BALANCE = 1000;
     constexpr int SMALL_BLIND     = 10;
     constexpr int BIG_BLIND       = 20;
-    constexpr int MAX_PLAYERS     = 4;
 }
 
 enum Suit {
@@ -90,6 +89,7 @@ struct Player {
     QVector<Card> holeCards;
     int balance = PokerConfig::DEFAULT_BALANCE;
     int currentBet = 0;
+    int totalContributed = 0; // Для расчета Side Pots
     bool isBot = false;
     bool hasFolded = false;
     bool isAllIn = false;

@@ -7,7 +7,6 @@
 #include <QTcpSocket>
 #include <QJsonObject>
 #include <QJsonDocument>
-#include <QJsonArray>
 
 namespace NetConfig {
     constexpr int MAX_PLAYERS = 4;
@@ -37,6 +36,7 @@ public:
     bool isHost           = true;
     bool isNetworkGame    = false;
     bool isLobby          = true;
+    bool isSessionActive  = false;
     int  myIdx            = 0;
 
     int gameType               = 0; // 0 = Покер, 1 = Дурак, 2 = Козёл, 3 = Уно

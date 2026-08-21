@@ -8,7 +8,6 @@
 #include <QJsonObject>
 #include <QJsonArray>
 
-#include "Poker.h"
 #include "AppSettings.h"
 
 enum UnoColor {

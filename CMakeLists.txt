@@ -103,6 +103,8 @@ if(WIN32)
     if(TARGET WrapZSTD)
         set_target_properties(WrapZSTD PROPERTIES INTERFACE_LINK_LIBRARIES "${ZSTD_STATIC}")
     endif()
+elseif(ANDROID)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets OpenGLWidgets Network Multimedia)
 else()
     # --- Настройки для Linux и macOS ---
     # --- Исправление бага Qt на macOS ---
@@ -146,7 +148,6 @@ if(WIN32)
 
     # Финализация (обязательна для Qt6 на Windows)
     qt_finalize_executable(${EXE_NAME})
-
 elseif(IOS)
     # --- Сборка под iOS ---
     set(IOS_ICON assets/icon.png)
@@ -180,38 +181,51 @@ elseif(IOS)
         "-framework AVFoundation"
         "-framework AudioToolbox"
     )
+elseif(ANDROID)
+    # --- Сборка под Android ---
+    qt_add_executable(${EXE_NAME} MANUAL_FINALIZATION ${SOURCES})
+
+    set_target_properties(${EXE_NAME} PROPERTIES
+        QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets/android"
+        QT_ANDROID_TARGET_SDK_VERSION "34"
+        QT_ANDROID_MIN_SDK_VERSION "24"
+    )
+
+    target_link_libraries(${EXE_NAME} PRIVATE Qt6::Widgets Qt6::OpenGLWidgets Qt6::Network Qt6::Multimedia)
+
+    qt_finalize_executable(${EXE_NAME})
+elseif(APPLE)
+    # --- Настройки для macOS ---
+    # На macOS собираем как Bundle для генерации .app директории
+    set(MACOSX_ICON assets/macos/icon.icns)
+    set(MACOSX_LOCALES
+        assets/macos/locales/ru.lproj/InfoPlist.strings
+        assets/macos/locales/en.lproj/InfoPlist.strings
+    )
+    # Размечаем ресурсы внутри бандла .app
+    set_source_files_properties(${MACOSX_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    set_source_files_properties(assets/macos/locales/ru.lproj/InfoPlist.strings PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/ru.lproj")
+    set_source_files_properties(assets/macos/locales/en.lproj/InfoPlist.strings PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/en.lproj")
+
+    add_executable(${EXE_NAME} MACOSX_BUNDLE ${SOURCES} ${MACOSX_ICON} ${MACOSX_LOCALES})
+
+    # Задаем метаданные бандла и подключаем кастомный Info.plist.in
+    set_target_properties(${EXE_NAME} PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/assets/macos/Info.plist.in
+        MACOSX_BUNDLE_ICON_FILE icon.icns
+        MACOSX_BUNDLE_BUNDLE_NAME "Royal Card Club"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.arta48.rcc"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.0"
+        MACOSX_BUNDLE_BUNDLE_VERSION "1.0.0"
+        MACOSX_BUNDLE_COPYRIGHT "Copyright © 2026 Arta48"
+        OUTPUT_NAME "Royal Card Club" # Задает правильное имя папки .app
+    )
+
+    target_link_libraries(${EXE_NAME} PRIVATE Qt6::Widgets Qt6::Network Qt6::Multimedia)
 else()
-    if(APPLE)
-        # --- Настройки для macOS ---
-        # На macOS собираем как Bundle для генерации .app директории
-        set(MACOSX_ICON assets/macos/icon.icns)
-        set(MACOSX_LOCALES
-            assets/macos/locales/ru.lproj/InfoPlist.strings
-            assets/macos/locales/en.lproj/InfoPlist.strings
-        )
-        # Размечаем ресурсы внутри бандла .app
-        set_source_files_properties(${MACOSX_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-        set_source_files_properties(assets/macos/locales/ru.lproj/InfoPlist.strings PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/ru.lproj")
-        set_source_files_properties(assets/macos/locales/en.lproj/InfoPlist.strings PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/en.lproj")
-
-        add_executable(${EXE_NAME} MACOSX_BUNDLE ${SOURCES} ${MACOSX_ICON} ${MACOSX_LOCALES})
-
-        # Задаем метаданные бандла и подключаем кастомный Info.plist.in
-        set_target_properties(${EXE_NAME} PROPERTIES
-            MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/assets/macos/Info.plist.in
-            MACOSX_BUNDLE_ICON_FILE icon.icns
-            MACOSX_BUNDLE_BUNDLE_NAME "Royal Card Club"
-            MACOSX_BUNDLE_GUI_IDENTIFIER "com.arta48.rcc"
-            MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0.0"
-            MACOSX_BUNDLE_BUNDLE_VERSION "1.0.0"
-            MACOSX_BUNDLE_COPYRIGHT "Copyright © 2026 Arta48"
-            OUTPUT_NAME "Royal Card Club" # Задает правильное имя папки .app
-        )
-    else()
-        # --- Настройки для Linux ---
-        # Обычная сборка для Linux
-        add_executable(${EXE_NAME} ${SOURCES})
-    endif()
+    # --- Настройки для Linux ---
+    # Обычная сборка для Linux
+    add_executable(${EXE_NAME} ${SOURCES})
 
     target_link_libraries(${EXE_NAME} PRIVATE Qt6::Widgets Qt6::Network Qt6::Multimedia)
 endif()

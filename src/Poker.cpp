@@ -63,7 +63,25 @@ HandValue evaluate5Cards(QVector<Card> c) {
 
 HandValue evaluate7Cards(const QVector<Card>& cards) {
     if (cards.size() < 5) return {HighCard, 0, ""};
+    if (cards.size() == 5) return evaluate5Cards(cards);
+
     HandValue best = {HighCard, 0, ""};
+
+    // Оптимизированный перебор ровно 21 сочетания
+    if (cards.size() == 7) {
+        for (int i = 0; i < 7; ++i) {
+            for (int j = i + 1; j < 7; ++j) {
+                QVector<Card> combo;
+                combo.reserve(5);
+                for (int k = 0; k < 7; ++k) {
+                    if (k != i && k != j) combo.append(cards[k]);
+                }
+                HandValue hv = evaluate5Cards(combo);
+                if (hv.score > best.score) best = hv;
+            }
+        }
+        return best;
+    }
 
     for (int i = 0; i < (1 << cards.size()); i++) {
         QVector<Card> combo;
@@ -140,12 +158,17 @@ void PokerEngine::startNewHand() {
         else if (!p.isDisconnected) p.isBankrupt = false;
     }
 
-    if (countSolventPlayers() < 2) {
+    bool isSinglePlayer = true;
+    for (int i = 1; i < players.size(); ++i) {
+        if (!players[i].isBot) { isSinglePlayer = false; break; }
+    }
+
+    if ((isSinglePlayer && myIdx < players.size() && players[myIdx].isBankrupt) || countSolventPlayers() < 2) {
         gameOver = true;
-        if (!players.isEmpty() && players[0].balance > 0) {
-            statusMessage = getLocalizedText("ИГРА ОКОНЧЕНА! Все оппоненты вышли или разорены.", "GAME OVER! All opponents left or broke.");
-        } else {
+        if (myIdx < players.size() && players[myIdx].balance <= 0) {
             statusMessage = getLocalizedText("ВЫ ПРОИГРАЛИ! Ваш баланс $0.", "YOU LOST! Your balance is $0.");
+        } else {
+            statusMessage = getLocalizedText("ИГРА ОКОНЧЕНА! Все оппоненты вышли или разорены.", "GAME OVER! All opponents left or broke.");
         }
         emit stateChanged();
         return;
@@ -180,6 +203,7 @@ void PokerEngine::startNewHand() {
         p.hasFolded = p.isBankrupt || p.isDisconnected;
         p.isAllIn = false;
         p.currentBet = 0;
+        p.totalContributed = 0;
         p.bestHand = {HighCard, 0, ""};
     }
 
@@ -224,6 +248,7 @@ int PokerEngine::countNonAllInPlayers() {
 void PokerEngine::placeBet(int pIdx, int amount) {
     players[pIdx].balance -= amount;
     players[pIdx].currentBet += amount;
+    players[pIdx].totalContributed += amount;
     pot += amount;
     if (players[pIdx].currentBet > currentHighestBet) {
         int raiseDiff = players[pIdx].currentBet - currentHighestBet;
@@ -363,9 +388,6 @@ void PokerEngine::checkPhaseAdvance() {
 }
 
 void PokerEngine::resolveShowdown() {
-    unsigned int bestScore = 0;
-    QVector<int> winners;
-
     AudioManager::instance().playSound(SoundEffect::Win);
 
     for (int i = 0; i < players.size(); ++i) {
@@ -373,29 +395,69 @@ void PokerEngine::resolveShowdown() {
             QVector<Card> totalCards = players[i].holeCards;
             totalCards.append(communityCards);
             players[i].bestHand = evaluate7Cards(totalCards);
-
-            if (players[i].bestHand.score > bestScore) {
-                bestScore = players[i].bestHand.score;
-                winners.clear();
-                winners.append(i);
-            } else if (players[i].bestHand.score == bestScore) {
-                winners.append(i);
-            }
         }
     }
 
-    int splitAmt = pot / std::max(1, static_cast<int>(winners.size()));
-    QString winNames = "";
-    for (int wIdx : winners) {
-        players[wIdx].balance += splitAmt;
-        winNames += players[wIdx].name + " ";
+    std::map<int, int> winnings;
+
+    // Расчет Side Pots и основного банка
+    while (pot > 0) {
+        int minContr = 99999999;
+        for (const auto& p : players) {
+            if (p.totalContributed > 0 && p.totalContributed < minContr) {
+                minContr = p.totalContributed;
+            }
+        }
+        if (minContr == 99999999 || minContr <= 0) break;
+
+        int segmentPot = 0;
+        QVector<int> eligible;
+        for (int i = 0; i < players.size(); ++i) {
+            if (players[i].totalContributed > 0) {
+                int take = std::min(players[i].totalContributed, minContr);
+                segmentPot += take;
+                players[i].totalContributed -= take;
+                if (!players[i].hasFolded) {
+                    eligible.append(i);
+                }
+            }
+        }
+        pot -= segmentPot;
+
+        if (eligible.isEmpty()) break;
+
+        unsigned int bestScore = 0;
+        QVector<int> segWinners;
+        for (int pIdx : eligible) {
+            if (players[pIdx].bestHand.score > bestScore) {
+                bestScore = players[pIdx].bestHand.score;
+                segWinners.clear();
+                segWinners.append(pIdx);
+            } else if (players[pIdx].bestHand.score == bestScore) {
+                segWinners.append(pIdx);
+            }
+        }
+
+        int split = segmentPot / std::max(1, static_cast<int>(segWinners.size()));
+        int rem = segmentPot % std::max(1, static_cast<int>(segWinners.size()));
+        for (int w : segWinners) winnings[w] += split;
+        if (rem > 0 && !segWinners.isEmpty()) winnings[segWinners.first()] += rem;
     }
 
-    if (winners.size() == 1) {
-        statusMessage = QString(getLocalizedText("%1 победил!\n(%2)", "%1 won!\n(%2)")).arg(players[winners[0]].name, players[winners[0]].bestHand.name);
-    } else {
-        statusMessage = QString(getLocalizedText("СПЛИТ-ПОТ! Ничья между:\n%1\n(%2)", "SPLIT POT! Tie between:\n%1\n(%2)")).arg(winNames, players[winners[0]].bestHand.name);
+    QStringList winSummaries;
+    for (auto const& [pIdx, amt] : winnings) {
+        players[pIdx].balance += amt;
+        winSummaries.append(QString("%1 (+$%2)").arg(players[pIdx].name).arg(amt));
     }
+
+    if (winnings.size() == 1) {
+        int wIdx = winnings.begin()->first;
+        statusMessage = QString(getLocalizedText("%1 победил!\n(%2)", "%1 won!\n(%2)")).arg(players[wIdx].name, players[wIdx].bestHand.name);
+    } else {
+        statusMessage = QString(getLocalizedText("Раздел банка:\n%1", "Split pot:\n%1")).arg(winSummaries.join(", "));
+    }
+
+    pot = 0;
     gameOver = true;
     emit stateChanged();
 }

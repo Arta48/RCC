@@ -19,6 +19,7 @@
 #include <QHBoxLayout>
 #include <QShortcut>
 #include <QTimer>
+#include <QElapsedTimer>
 #include <functional>
 
 #include "NetworkManager.h"
@@ -52,6 +53,14 @@ public:
         qreal scaleW = width() / 1280.0;
         qreal scaleH = height() / 720.0;
         return std::clamp(std::min(scaleW, scaleH), 0.45, 2.5);
+    }
+
+    int getSafeLeftMargin() const {
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+        return qMax(15, qRound(35 * getScale()));
+#else
+        return qRound(15 * getScale());
+#endif
     }
 
 protected:
@@ -92,6 +101,7 @@ public:
 protected:
     void paintEvent(QPaintEvent* ev) override;
     void resizeEvent(QResizeEvent* ev) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
 };
 
 /**
@@ -119,6 +129,7 @@ public:
     void onPlayerAction(const QString& action, int raiseTotal = 0);
     void handleAiLogic();
     void updateUI();
+    void processNetAction(int senderId, const QJsonObject& json);
     void broadcastNetState();
 
 protected:
@@ -234,6 +245,7 @@ public:
 
     qreal   arrowAnimAngle = 0.0;
     QTimer* arrowAnimTimer = nullptr;
+    QElapsedTimer animElapsedTimer;
 
 protected:
     void resizeEvent(QResizeEvent* ev) override;

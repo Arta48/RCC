@@ -11,6 +11,7 @@ void NetworkManager::disconnectAll() {
     isHost = false;
     isNetworkGame = false;
     isLobby = false;
+    isSessionActive = false;
     myIdx = 0;
 
     if (tcpServer) {
@@ -130,18 +131,7 @@ void NetworkManager::connectToHost(const QString& ip, int mySelectedGameType) {
     tcpSocket = new QTcpSocket(this);
     connect(tcpSocket, &QTcpSocket::readyRead, this, &NetworkManager::onNetworkReadClient);
 
-    auto handleDisconnect = [this]() {
-        if (!isNetworkGame || isHost) return; // Игнорируем вызов, если сеть уже сброшена
-
-        isLobby = false;
-        emit lobbyStatusChanged(getLocalizedText("Связь с сервером потеряна! Хост отключился.", "Connection lost! Host disconnected."));
-        emit signalHostDisconnected();
-    };
-
-    connect(tcpSocket, &QAbstractSocket::errorOccurred, this, [handleDisconnect](auto) {
-        handleDisconnect();
-    });
-    connect(tcpSocket, &QTcpSocket::disconnected, this, handleDisconnect);
+    isSessionActive = false;
 
     connect(tcpSocket, &QTcpSocket::connected, this, [this]() {
         emit lobbyStatusChanged(getLocalizedText("Подключено! Ожидание лобби...", "Connected! Waiting for lobby..."));
@@ -151,6 +141,28 @@ void NetworkManager::connectToHost(const QString& ip, int mySelectedGameType) {
         joinJson["name"]   = AppSettings::instance().nickname;
         joinJson["avatar"] = static_cast<int>(AppSettings::instance().avatar);
         sendJsonToServer(joinJson);
+    });
+
+    auto handleDisconnect = [this]() {
+        if (!isNetworkGame || isHost) return; // Игнорируем вызов, если сеть уже сброшена
+
+        bool wasInSession = isSessionActive;
+        QString msg = wasInSession ? getLocalizedText("Связь с сервером потеряна! Хост отключился.", "Connection lost! Host disconnected.") : getLocalizedText("Ошибка: Сервер не найден или лобби не существует!", "Error: Server not found or lobby does not exist!");
+
+        isLobby = false;
+        disconnectAll();
+        emit lobbyStatusChanged(msg);
+        if (wasInSession) {
+            emit signalHostDisconnected();
+        }
+    };
+
+    connect(tcpSocket, &QAbstractSocket::errorOccurred, this, [handleDisconnect](QAbstractSocket::SocketError) {
+        handleDisconnect();
+    });
+
+    connect(tcpSocket, &QTcpSocket::disconnected, this, [handleDisconnect]() {
+        handleDisconnect();
     });
 
     tcpSocket->connectToHost(ip, AppSettings::instance().serverPort);
@@ -197,15 +209,28 @@ void NetworkManager::onNetworkReadHost() {
             int cAvatar = json["avatar"].toInt(0);
             if (cName.isEmpty()) cName = getLocalizedText("Игрок", "Player");
 
+            // Проверяем всех участников
             int existingIdx = -1;
-            for (int i = 1; i < lobbyClients.size(); ++i) {
+            for (int i = 0; i < lobbyClients.size(); ++i) {
                 if (lobbyClients[i].name == cName) {
                     existingIdx = i;
                     break;
                 }
             }
 
-            if (existingIdx != -1) {
+            // Если имя совпало с хостом или с уже подключенным игроком — отклоняем новичка
+            if (existingIdx == 0 || (existingIdx != -1 && (isLobby || !lobbyClients[existingIdx].isDisconnected))) {
+                QJsonObject errJson;
+                errJson["error"] = true;
+                errJson["message"] = getLocalizedText("Ошибка: Игрок с таким именем уже в лобби!", "Error: Player with this name is already in lobby!");
+                senderSocket->write(QJsonDocument(errJson).toJson(QJsonDocument::Compact) + "\n");
+                senderSocket->flush();
+                senderSocket->disconnectFromHost();
+                return;
+            }
+
+            // Легитимный реконнект отключившегося клиента посреди матча
+            if (existingIdx > 0) {
                 int socketSlot = existingIdx - 1;
                 if (socketSlot < clientSockets.size()) {
                     auto* oldSocket = clientSockets[socketSlot];
@@ -266,6 +291,17 @@ void NetworkManager::onNetworkReadClient() {
         if (!doc.isObject()) continue;
         QJsonObject json = doc.object();
 
+        isSessionActive = true;
+
+        // Обработка ошибки от сервера (например, занятый ник)
+        if (json.contains("error") && json["error"].toBool()) {
+            QString errMsg = json["message"].toString();
+            isLobby = false;
+            disconnectAll();
+            emit lobbyStatusChanged(errMsg);
+            return;
+        }
+
         int serverGameType = json["gameType"].toInt();
         if (serverGameType != selectedClientGameType) {
             static const QString gameNames[] = { getLocalizedText("Покера", "Poker"), getLocalizedText("Дурака", "Durak"), getLocalizedText("Козла", "Kozel"), getLocalizedText("Уно", "UNO") };
@@ -274,6 +310,7 @@ void NetworkManager::onNetworkReadClient() {
 
             QString errorMsg = QString(getLocalizedText("Ошибка: Вы выбрали %1, а это лобби %2!", "Error: You selected %1, but this is a %2 lobby!")).arg(myGame, serverGame);
 
+            isLobby = false;
             disconnectAll();
             emit lobbyStatusChanged(errorMsg);
             return;

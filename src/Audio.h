@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QMediaPlayer>
 #include <QAudioOutput>
+#include <QSoundEffect>
 #include <QMap>
 #include <QUrl>
 
@@ -22,11 +23,10 @@ enum class SoundEffect {
 };
 
 /**
- * @brief Структура хранения связки проигрывателя и аудиовыхода для SFX.
+ * @brief Структура хранения связки проигрывателя для SFX.
  */
 struct SfxItem {
-    QMediaPlayer* player = nullptr;
-    QAudioOutput* audioOutput = nullptr;
+    QSoundEffect* effect = nullptr;
 };
 
 /**
@@ -41,6 +41,8 @@ public:
     void playSound(SoundEffect effect);
     void startMusic();
     void stopMusic();
+    void pauseMusic();
+    void resumeMusic();
     void setMusicVolume(float volume);
     void setSfxVolume(float volume);
     void toggleMuteMusic();

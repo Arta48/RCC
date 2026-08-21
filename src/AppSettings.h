@@ -5,7 +5,6 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QCoreApplication>
 #include <QLocale>
 #include <QStandardPaths>
 #include <QDir>
@@ -85,18 +84,6 @@ public:
     bool autoNextHand           = true;
     bool showPokerHandHint      = true;
     quint16 serverPort          = 12345;
-
-    /**
-     * @brief Возвращает эмодзи, соответствующий текущему выбранному аватару.
-     */
-    QString getAvatarEmoji() const {
-        switch (avatar) {
-            case AvatarIcon::Skull:     return "💀";
-            case AvatarIcon::SuitSpade: return "♠";
-            case AvatarIcon::Joker:     return "🃏";
-            default:                    return "👑";
-        }
-    }
 
     /**
      * @brief Сохранение настроек в формате JSON.

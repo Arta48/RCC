@@ -2,6 +2,7 @@
 <RCC version="1.0">
     <qresource>
         <file alias="icon.png">icon.png</file>
+        <file alias="NotoSans.ttf">NotoSans-Regular.ttf</file>
         <!-- Аудиоресурсы -->
         <file>audio/bg_jazz.mp3</file>
         <file>audio/button_click.wav</file>
