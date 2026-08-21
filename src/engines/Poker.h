@@ -15,19 +15,22 @@ namespace PokerConfig {
     constexpr int BIG_BLIND       = 20;
 }
 
+/**
+ * @brief Перечисление карточных мастей.
+ */
 enum Suit {
-    Hearts   = 0,
-    Diamonds = 1,
-    Clubs    = 2,
-    Spades   = 3
+    Hearts   = 0, ///< ♥ Червы
+    Diamonds = 1, ///< ♦ Бубны
+    Clubs    = 2, ///< ♣ Трефы
+    Spades   = 3  ///< ♠ Пики
 };
 
 /**
- * @brief Структура отдельной игральной карты.
+ * @brief Структура отдельной игральной карты стандартной колоды.
  */
 struct Card {
     Suit suit = Hearts;
-    int  rank = 2; // 2..14 (14 = Туз)
+    int  rank = 2; ///< Ранг: 2..14 (14 = Туз)
 
     QJsonObject toJson() const;
     static Card fromJson(const QJsonObject& obj);
@@ -36,30 +39,36 @@ struct Card {
     bool operator==(const Card& o) const;
 };
 
+/**
+ * @brief Иерархия силы покерных комбинаций Техасского Холдема.
+ */
 enum HandRank {
-    HighCard,
-    Pair,
-    TwoPair,
-    ThreeOfAKind,
-    Straight,
-    Flush,
-    FullHouse,
-    FourOfAKind,
-    StraightFlush
+    HighCard,      ///< Старшая карта
+    Pair,          ///< Пара
+    TwoPair,       ///< Две пары
+    ThreeOfAKind,  ///< Тройка (Сет)
+    Straight,      ///< Стрит
+    Flush,         ///< Флеш
+    FullHouse,     ///< Фулл-Хаус
+    FourOfAKind,   ///< Каре
+    StraightFlush  ///< Стрит-Флеш / Роял-Флеш
 };
 
 /**
- * @brief Результат вычисления покерной комбинации.
+ * @brief Результат расчета силы покерной комбинации.
  */
 struct HandValue {
-    HandRank rank = HighCard;
-    unsigned int score = 0;
-    QString name = "";
+    HandRank     rank  = HighCard;
+    unsigned int score = 0;       ///< Уникальный битовый скор для мгновенного численного сравнения
+    QString      name  = "";
 };
 
 HandValue evaluate5Cards(QVector<Card> c);
 HandValue evaluate7Cards(const QVector<Card>& cards);
 
+/**
+ * @brief Фазы покерной раздачи.
+ */
 enum Phase {
     WAITING,
     PREFLOP,
@@ -80,26 +89,26 @@ inline QString getAvatarEmojiById(int avatarId) {
 }
 
 /**
- * @brief Состояние игрока в покере.
+ * @brief Состояние участника покерного стола.
  */
 struct Player {
-    int id = 0;
-    QString name;
-    int avatar = 0;
+    int           id = 0;
+    QString       name;
+    int           avatar = 0;
     QVector<Card> holeCards;
-    int balance = PokerConfig::DEFAULT_BALANCE;
-    int currentBet = 0;
-    int totalContributed = 0; // Для расчета Side Pots
-    bool isBot = false;
-    bool hasFolded = false;
-    bool isAllIn = false;
-    bool isBankrupt = false;
-    bool isDisconnected = false;
-    HandValue bestHand;
+    int           balance          = PokerConfig::DEFAULT_BALANCE;
+    int           currentBet       = 0;
+    int           totalContributed = 0; ///< Накопленный вклад в раздачу для расчета побочных банков (Side Pots)
+    bool          isBot            = false;
+    bool          hasFolded        = false;
+    bool          isAllIn          = false;
+    bool          isBankrupt       = false;
+    bool          isDisconnected   = false;
+    HandValue     bestHand;
 };
 
 /**
- * @brief Движок правил игры Texas Hold'em Poker (Изолированный от сети).
+ * @brief Движок правил игры Texas Hold'em Poker (Изолирован от графики и сети).
  */
 class PokerEngine : public QObject {
     Q_OBJECT
@@ -122,7 +131,7 @@ public:
 
     QString statusMessage;
     bool    gameOver           = false;
-    bool    isProcessingMove   = false; // Защита от состояния гонки таймеров ИИ
+    bool    isProcessingMove   = false;
     int     myIdx              = 0;
 
     void initGame(int oppCount, bool netGame = false);

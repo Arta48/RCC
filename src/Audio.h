@@ -11,31 +11,34 @@
  * @brief Перечисление звуковых эффектов игры.
  */
 enum class SoundEffect {
-    ButtonClick,
-    CardShuffle,
-    CardPlace,
-    ChipBet,
-    Check,
-    Fold,
-    Win,
-    Lose,
-    Bito
+    ButtonClick, ///< Клик по кнопкам интерфейса
+    CardShuffle, ///< Перетасовка колоды
+    CardPlace,   ///< Выкладывание карты на стол
+    ChipBet,     ///< Ставка фишек в банке
+    Check,       ///< Стук по столу (Чек / Объявление Уно)
+    Fold,        ///< Сброс карт в пас
+    Win,         ///< Звук победы
+    Lose,        ///< Звук поражения / взятия карт
+    Bito         ///< Звук отбоя карт (Бито)
 };
 
 /**
- * @brief Структура хранения связки проигрывателя для SFX.
+ * @brief Контейнер обертки для экземпляра звукового эффекта.
  */
 struct SfxItem {
     QSoundEffect* effect = nullptr;
 };
 
 /**
- * @brief Менеджер аудиосистемы приложения (Синглтон).
- * Управляет фоновой музыкой и звуковыми эффектами.
+ * @brief Глобальный менеджер аудиосистемы приложения (Синглтон).
+ * Обеспечивает циклическое воспроизведение фоновой музыки и воспроизведение SFX-эффектов с независимой громкостью.
  */
 class AudioManager : public QObject {
     Q_OBJECT
 public:
+    /**
+     * @brief Получение глобального экземпляра AudioManager.
+     */
     static AudioManager& instance();
 
     void playSound(SoundEffect effect);
@@ -61,8 +64,8 @@ private:
 
     void initEffects();
 
-    QMediaPlayer* m_bgPlayer = nullptr;
-    QAudioOutput* m_bgAudioOutput = nullptr;
+    QMediaPlayer*            m_bgPlayer      = nullptr;
+    QAudioOutput*            m_bgAudioOutput = nullptr;
     QMap<SoundEffect, SfxItem> m_effects;
 
     float m_musicVolume = 0.05f;

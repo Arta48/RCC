@@ -20,7 +20,7 @@ AudioManager::AudioManager(QObject* parent) : QObject(parent) {
 void AudioManager::initEffects() {
     struct EffectMapping {
         SoundEffect type;
-        QString path;
+        QString     path;
     };
 
     const EffectMapping mappings[] = {

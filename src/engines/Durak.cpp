@@ -14,8 +14,8 @@ void DurakEngine::initGame(int oppCount, bool netGame) {
 
     DurakPlayer human;
     human.id = 0;
-    human.name = AppSettings::instance().nickname;
-    human.avatar = static_cast<int>(AppSettings::instance().avatar);
+    human.name = AppSettings::instance().getNickname();
+    human.avatar = static_cast<int>(AppSettings::instance().getAvatar());
     human.isBot = false;
     players.append(human);
 
@@ -35,7 +35,7 @@ void DurakEngine::initGame(int oppCount, bool netGame) {
     }
 
     for (int i = deck.size() - 1; i > 0; --i) {
-        int j = QRandomGenerator::global()->bounded(i + 1);
+        const int j = QRandomGenerator::global()->bounded(i + 1);
         deck.swapItemsAt(i, j);
     }
 
@@ -60,10 +60,10 @@ void DurakEngine::initGame(int oppCount, bool netGame) {
 
 void DurakEngine::replenishHands() {
     if (deck.isEmpty()) return;
-    int n = players.size();
+    const int n = players.size();
 
     for (int i = 0; i < n; ++i) {
-        int pIdx = (attackerIdx + i) % n;
+        const int pIdx = (attackerIdx + i) % n;
         if (pIdx == defenderIdx) continue;
 
         if (!players[pIdx].isOut) {
@@ -96,10 +96,10 @@ bool DurakEngine::playAttackCard(int playerIdx, int cardHandIdx) {
     auto& hand = players[playerIdx].hand;
     if (cardHandIdx < 0 || cardHandIdx >= hand.size()) return false;
 
-    Card card = hand[cardHandIdx];
+    const Card card = hand[cardHandIdx];
     if (!canAttackWith(card)) return false;
 
-    int defenderCardsCount = players[defenderIdx].hand.size();
+    const int defenderCardsCount = players[defenderIdx].hand.size();
     int undefendedCount = 0;
     for (const auto& p : table) if (!p.isDefended) undefendedCount++;
     if (undefendedCount >= defenderCardsCount || table.size() >= 6) return false;
@@ -131,8 +131,8 @@ bool DurakEngine::playDefendCard(int playerIdx, int cardHandIdx, int tableIdx) {
     if (tableIdx < 0 || tableIdx >= table.size()) return false;
     if (table[tableIdx].isDefended) return false;
 
-    Card defCard = hand[cardHandIdx];
-    Card atkCard = table[tableIdx].attack;
+    const Card defCard = hand[cardHandIdx];
+    const Card atkCard = table[tableIdx].attack;
 
     bool beats = false;
     if (defCard.suit == atkCard.suit && defCard.rank > atkCard.rank) beats = true;
@@ -215,7 +215,7 @@ void DurakEngine::passAction() {
 void DurakEngine::takeAction() {
     if (table.isEmpty()) return;
 
-    int defenderCardsCount = players[defenderIdx].hand.size();
+    const int defenderCardsCount = players[defenderIdx].hand.size();
     int undefendedCount = 0;
     for (const auto& p : table) if (!p.isDefended) undefendedCount++;
 
@@ -227,9 +227,9 @@ void DurakEngine::takeAction() {
     }
 
     int firstTosser = -1;
-    int n = players.size();
+    const int n = players.size();
     for (int i = 0; i < n; ++i) {
-        int pIdx = (attackerIdx + i) % n;
+        const int pIdx = (attackerIdx + i) % n;
         if (pIdx != defenderIdx && !players[pIdx].isOut && !players[pIdx].hand.isEmpty()) {
             firstTosser = pIdx;
             break;
@@ -283,7 +283,7 @@ bool DurakEngine::makeAiMove() {
 
     if (table.isEmpty()) {
         while (players[attackerIdx].isOut || players[attackerIdx].hand.isEmpty()) {
-            int nextAttacker = getNextActivePlayer(attackerIdx);
+            const int nextAttacker = getNextActivePlayer(attackerIdx);
             if (nextAttacker == attackerIdx) {
                 checkWinCondition();
                 isProcessingMove = false;
@@ -305,9 +305,9 @@ bool DurakEngine::makeAiMove() {
 
     if (isDefenderTaking) {
         auto getNextTosser = [this](int current) {
-            int n = players.size();
+            const int n = players.size();
             for (int i = 1; i <= n; ++i) {
-                int next = (current + i) % n;
+                const int next = (current + i) % n;
                 if (next != defenderIdx && !players[next].isOut && !players[next].hand.isEmpty()) {
                     return next;
                 }
@@ -315,7 +315,7 @@ bool DurakEngine::makeAiMove() {
             return -1;
         };
 
-        int activeTosser = getNextTosser(currentTurnIdx);
+        const int activeTosser = getNextTosser(currentTurnIdx);
 
         if (activeTosser == -1) {
             passAction();
@@ -351,7 +351,7 @@ bool DurakEngine::makeAiMove() {
             }
 
             if (!threwIn) {
-                int nextP = getNextTosser(currentTurnIdx);
+                const int nextP = getNextTosser(currentTurnIdx);
                 if (nextP == -1 || nextP == currentTurnIdx) {
                     passAction();
                 } else {
@@ -395,7 +395,7 @@ bool DurakEngine::makeAiMove() {
                 }
             }
 
-            int playIdx = (bestCardIdx != -1) ? bestCardIdx : bestTrumpIdx;
+            const int playIdx = (bestCardIdx != -1) ? bestCardIdx : bestTrumpIdx;
             if (playIdx != -1) {
                 playAttackCard(attackerIdx, playIdx);
                 isProcessingMove = false;
@@ -451,17 +451,17 @@ bool DurakEngine::makeAiMove() {
             bool canDefendAll = true;
 
             for (int tIdx : undefendedTableIndices) {
-                Card atk = table[tIdx].attack;
+                const Card atk = table[tIdx].attack;
                 int bestDefIdx = -1;
                 int minWeight = 999;
 
                 for (int c = 0; c < tempHand.size(); ++c) {
-                    Card def = tempHand[c];
-                    bool beats = (def.suit == atk.suit && def.rank > atk.rank) ||
+                    const Card def = tempHand[c];
+                    const bool beats = (def.suit == atk.suit && def.rank > atk.rank) ||
                     (def.suit == trumpCard.suit && atk.suit != trumpCard.suit);
 
                     if (beats) {
-                        int weight = def.rank + (def.suit == trumpCard.suit ? 100 : 0);
+                        const int weight = def.rank + (def.suit == trumpCard.suit ? 100 : 0);
                         if (weight < minWeight) {
                             minWeight = weight;
                             bestDefIdx = c;
@@ -483,18 +483,18 @@ bool DurakEngine::makeAiMove() {
                 return true;
             }
 
-            int tIdx = undefendedTableIndices.first();
-            Card atk = table[tIdx].attack;
+            const int tIdx = undefendedTableIndices.first();
+            const Card atk = table[tIdx].attack;
             int bestHandIdx = -1;
             int minWeight = 999;
 
             for (int c = 0; c < hand.size(); ++c) {
-                Card def = hand[c];
-                bool beats = (def.suit == atk.suit && def.rank > atk.rank) ||
+                const Card def = hand[c];
+                const bool beats = (def.suit == atk.suit && def.rank > atk.rank) ||
                 (def.suit == trumpCard.suit && atk.suit != trumpCard.suit);
 
                 if (beats) {
-                    int weight = def.rank + (def.suit == trumpCard.suit ? 100 : 0);
+                    const int weight = def.rank + (def.suit == trumpCard.suit ? 100 : 0);
                     if (weight < minWeight) {
                         minWeight = weight;
                         bestHandIdx = c;
@@ -527,9 +527,9 @@ int DurakEngine::countActivePlayers() {
 }
 
 int DurakEngine::getNextActivePlayer(int current) {
-    int n = players.size();
+    const int n = players.size();
     for (int i = 1; i <= n; ++i) {
-        int next = (current + i) % n;
+        const int next = (current + i) % n;
         if (!players[next].isOut && !players[next].hand.isEmpty()) {
             return next;
         }
@@ -557,8 +557,8 @@ void DurakEngine::handlePlayerReconnect(int pIdx) {
 void DurakEngine::handlePlayerDisconnect(int pIdx) {
     if (pIdx < 0 || pIdx >= players.size()) return;
 
-    QString disconnectedName = players[pIdx].name;
-    bool wasSpectator = players[pIdx].isOut && !deck.isEmpty();
+    const QString disconnectedName = players[pIdx].name;
+    const bool wasSpectator = players[pIdx].isOut && !deck.isEmpty();
 
     players.removeAt(pIdx);
 
@@ -575,7 +575,7 @@ void DurakEngine::handlePlayerDisconnect(int pIdx) {
         return;
     }
 
-    int active = countActivePlayers();
+    const int active = countActivePlayers();
     if (active <= 1) {
         gameOver = true;
         statusMessage = getLocalizedText("Все оппоненты вышли! Игра завершена.", "All opponents left! Game over.");
@@ -645,12 +645,12 @@ void DurakEngine::fromJson(const QJsonObject& json) {
     statusMessage    = json["statusMessage"].toString();
     trumpCard        = Card::fromJson(json["trumpCard"].toObject());
 
-    int deckSize = json["deckSize"].toInt();
+    const int deckSize = json["deckSize"].toInt();
     deck.resize(deckSize);
 
     table.clear();
     for (auto val : json["table"].toArray()) {
-        QJsonObject pObj = val.toObject();
+        const QJsonObject pObj = val.toObject();
         DurakTablePair pair;
         pair.attack     = Card::fromJson(pObj["attack"].toObject());
         pair.defend     = Card::fromJson(pObj["defend"].toObject());
@@ -658,19 +658,19 @@ void DurakEngine::fromJson(const QJsonObject& json) {
         table.append(pair);
     }
 
-    QJsonArray pArr = json["players"].toArray();
+    const QJsonArray pArr = json["players"].toArray();
     players.resize(pArr.size());
     for (int i = 0; i < pArr.size(); ++i) {
-        QJsonObject pObj = pArr[i].toObject();
+        const QJsonObject pObj = pArr[i].toObject();
         players[i].id     = pObj["id"].toInt();
         players[i].name   = pObj["name"].toString();
         players[i].avatar = pObj["avatar"].toInt(0);
         players[i].isBot  = pObj["isBot"].toBool();
         players[i].isOut  = pObj["isOut"].toBool();
 
-        int handSize = pObj["handSize"].toInt();
+        const int handSize = pObj["handSize"].toInt();
         players[i].hand.clear();
-        QJsonArray handArr = pObj["hand"].toArray();
+        const QJsonArray handArr = pObj["hand"].toArray();
 
         if (!handArr.isEmpty()) {
             for (auto cVal : handArr) {

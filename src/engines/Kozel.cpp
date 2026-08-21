@@ -20,8 +20,8 @@ void KozelEngine::initGame(int oppCount, bool netGame) {
 
     KozelPlayer human;
     human.id = 0;
-    human.name = AppSettings::instance().nickname;
-    human.avatar = static_cast<int>(AppSettings::instance().avatar);
+    human.name = AppSettings::instance().getNickname();
+    human.avatar = static_cast<int>(AppSettings::instance().getAvatar());
     human.isBot = false;
     players.append(human);
 
@@ -41,7 +41,7 @@ void KozelEngine::initGame(int oppCount, bool netGame) {
     }
 
     for (int i = deck.size() - 1; i > 0; --i) {
-        int j = QRandomGenerator::global()->bounded(i + 1);
+        const int j = QRandomGenerator::global()->bounded(i + 1);
         deck.swapItemsAt(i, j);
     }
 
@@ -68,8 +68,8 @@ bool KozelEngine::isValidMove(int playerIdx, const Card& card) const {
     if (playerIdx != currentTurnIdx) return false;
     if (currentTrick.isEmpty()) return true;
 
-    Suit leadSuit = currentTrick.first().second.suit;
-    auto& hand = players[playerIdx].hand;
+    const Suit leadSuit = currentTrick.first().second.suit;
+    const auto& hand = players[playerIdx].hand;
 
     bool hasLeadSuit = false;
     for (const auto& c : hand) if (c.suit == leadSuit) hasLeadSuit = true;
@@ -86,7 +86,7 @@ void KozelEngine::playCards(int playerIdx, QVector<int> cardIndices) {
     bool playedAny = false;
     for (int idx : cardIndices) {
         if (idx >= 0 && idx < players[playerIdx].hand.size()) {
-            Card c = players[playerIdx].hand[idx];
+            const Card c = players[playerIdx].hand[idx];
             if (isValidMove(playerIdx, c)) {
                 players[playerIdx].hand.removeAt(idx);
                 currentTrick.append({ playerIdx, c });
@@ -97,7 +97,7 @@ void KozelEngine::playCards(int playerIdx, QVector<int> cardIndices) {
 
     if (!playedAny && !players[playerIdx].hand.isEmpty()) {
         for (int i = 0; i < players[playerIdx].hand.size(); ++i) {
-            Card c = players[playerIdx].hand[i];
+            const Card c = players[playerIdx].hand[i];
             if (isValidMove(playerIdx, c)) {
                 players[playerIdx].hand.removeAt(i);
                 currentTrick.append({ playerIdx, c });
@@ -111,7 +111,7 @@ void KozelEngine::playCards(int playerIdx, QVector<int> cardIndices) {
 
     int cardsPerPlayer = 1;
     if (!currentTrick.isEmpty()) {
-        int firstPlayerId = currentTrick.first().first;
+        const int firstPlayerId = currentTrick.first().first;
         cardsPerPlayer = 0;
         for (const auto& p : currentTrick) {
             if (p.first == firstPlayerId) cardsPerPlayer++;
@@ -129,13 +129,12 @@ void KozelEngine::playCards(int playerIdx, QVector<int> cardIndices) {
 }
 
 void KozelEngine::resolveTrick() {
-    Suit leadSuit = currentTrick.first().second.suit;
     int bestIdx = 0;
     Card bestCard = currentTrick.first().second;
     int trickPoints = 0;
 
     for (int i = 0; i < currentTrick.size(); ++i) {
-        Card c = currentTrick[i].second;
+        const Card c = currentTrick[i].second;
         trickPoints += getKozelCardPoints(c.rank);
 
         if (c.suit == trumpSuit && bestCard.suit != trumpSuit) {
@@ -145,7 +144,7 @@ void KozelEngine::resolveTrick() {
         }
     }
 
-    int winnerPlayerIdx = currentTrick[bestIdx].first;
+    const int winnerPlayerIdx = currentTrick[bestIdx].first;
     players[winnerPlayerIdx].pointsCollected += trickPoints;
 
     currentTrick.clear();
@@ -161,7 +160,6 @@ void KozelEngine::resolveTrick() {
             advanceTurn();
         }
     }
-
 }
 
 void KozelEngine::checkWinCondition() {
@@ -194,7 +192,6 @@ void KozelEngine::checkWinCondition() {
         } else {
             statusMessage = getLocalizedText("Никто не набрал 60 очков! Раздел!", "No one reached 60 points! Split!");
         }
-
     }
 }
 
@@ -210,11 +207,11 @@ bool KozelEngine::makeAiMove() {
     }
 
     if (players[currentTurnIdx].isBot) {
-        auto& hand = players[currentTurnIdx].hand;
+        const auto& hand = players[currentTurnIdx].hand;
 
         int requiredCardCount = 1;
         if (!currentTrick.isEmpty()) {
-            int firstPlayerId = currentTrick.first().first;
+            const int firstPlayerId = currentTrick.first().first;
             requiredCardCount = 0;
             for (const auto& p : currentTrick) {
                 if (p.first == firstPlayerId) requiredCardCount++;
@@ -262,9 +259,9 @@ int KozelEngine::countActivePlayers() {
 void KozelEngine::advanceTurn() {
     if (gameOver) return;
 
-    int n = players.size();
+    const int n = players.size();
     for (int i = 1; i <= n; ++i) {
-        int next = (currentTurnIdx + i) % n;
+        const int next = (currentTurnIdx + i) % n;
         if (!players[next].hand.isEmpty()) {
             currentTurnIdx = next;
             updateStatus();
@@ -292,8 +289,8 @@ void KozelEngine::handlePlayerReconnect(int pIdx) {
 void KozelEngine::handlePlayerDisconnect(int pIdx) {
     if (pIdx < 0 || pIdx >= players.size()) return;
 
-    QString disconnectedName = players[pIdx].name;
-    bool wasSpectator = players[pIdx].isOut;
+    const QString disconnectedName = players[pIdx].name;
+    const bool wasSpectator = players[pIdx].isOut;
 
     players.removeAt(pIdx);
 
@@ -309,7 +306,7 @@ void KozelEngine::handlePlayerDisconnect(int pIdx) {
         return;
     }
 
-    int activeCount = countActivePlayers();
+    const int activeCount = countActivePlayers();
     if (activeCount <= 1) {
         gameOver = true;
         statusMessage = getLocalizedText("Все оппоненты вышли! Игра завершена.", "All opponents left! Game over.");
@@ -373,19 +370,19 @@ void KozelEngine::fromJson(const QJsonObject& json) {
     gameOver       = json["gameOver"].toBool();
     statusMessage  = json["statusMessage"].toString();
 
-    int deckSize = json["deckSize"].toInt();
+    const int deckSize = json["deckSize"].toInt();
     deck.resize(deckSize);
 
     currentTrick.clear();
     for (auto val : json["currentTrick"].toArray()) {
-        QJsonObject tObj = val.toObject();
+        const QJsonObject tObj = val.toObject();
         currentTrick.append({ tObj["playerIdx"].toInt(), Card::fromJson(tObj["card"].toObject()) });
     }
 
-    QJsonArray pArr = json["players"].toArray();
+    const QJsonArray pArr = json["players"].toArray();
     players.resize(pArr.size());
     for (int i = 0; i < pArr.size(); ++i) {
-        QJsonObject pObj = pArr[i].toObject();
+        const QJsonObject pObj = pArr[i].toObject();
         players[i].id              = pObj["id"].toInt();
         players[i].name            = pObj["name"].toString();
         players[i].avatar          = pObj["avatar"].toInt(0);
@@ -393,9 +390,9 @@ void KozelEngine::fromJson(const QJsonObject& json) {
         players[i].isBot           = pObj["isBot"].toBool();
         players[i].isOut           = pObj["isOut"].toBool();
 
-        int handSize = pObj["handSize"].toInt();
+        const int handSize = pObj["handSize"].toInt();
         players[i].hand.clear();
-        QJsonArray handArr = pObj["hand"].toArray();
+        const QJsonArray handArr = pObj["hand"].toArray();
 
         if (!handArr.isEmpty()) {
             for (auto cVal : handArr) {

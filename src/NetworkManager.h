@@ -14,18 +14,18 @@ namespace NetConfig {
 }
 
 /**
- * @brief Структура хранения метаданных подключенного клиента в лобби.
+ * @brief Метаданные подключенного клиента в лобби.
  */
 struct ConnectedClient {
-    int id = 0;
+    int     id = 0;
     QString name;
-    int avatar = 0;
-    bool isDisconnected = false;
+    int     avatar = 0;
+    bool    isDisconnected = false;
 };
 
 /**
- * @brief Сетевой менеджер (Host / Client) для координации комнат и передачи JSON-пакетов.
- * Полностью изолирован от правил конкретных карточных игр.
+ * @brief Сетевой менеджер (Host / Client) для координации комнат и передачи JSON-сообщений.
+ * Полностью изолирован от правил конкретных игр.
  */
 class NetworkManager : public QObject {
     Q_OBJECT
@@ -39,12 +39,12 @@ public:
     bool isSessionActive  = false;
     int  myIdx            = 0;
 
-    int gameType               = 0; // 0 = Покер, 1 = Дурак, 2 = Козёл, 3 = Уно
+    int gameType               = 0; // 0: Покер, 1: Дурак, 2: Козёл, 3: Уно
     int selectedClientGameType = 0;
 
-    QTcpServer*          tcpServer = nullptr;
-    QTcpSocket*          tcpSocket = nullptr;
-    QVector<QTcpSocket*> clientSockets;
+    QTcpServer*              tcpServer = nullptr;
+    QTcpSocket*              tcpSocket = nullptr;
+    QVector<QTcpSocket*>     clientSockets;
     QVector<ConnectedClient> lobbyClients;
 
     void startHostServer(int selectedGameType);

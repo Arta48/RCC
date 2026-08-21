@@ -10,24 +10,33 @@
 
 #include "AppSettings.h"
 
+/**
+ * @brief Цвета карт Уно.
+ */
 enum UnoColor {
-    UnoRed    = 0,
-    UnoYellow = 1,
-    UnoGreen  = 2,
-    UnoBlue   = 3,
-    UnoWild   = 4
+    UnoRed    = 0, // Красный
+    UnoYellow = 1, // Жёлтый
+    UnoGreen  = 2, // Зелёный
+    UnoBlue   = 3, // Синий
+    UnoWild   = 4  // Дикая карта (Черная)
 };
 
+/**
+ * @brief Достоинства и действия карт Уно.
+ */
 enum UnoValue {
     UnoZero = 0, UnoOne, UnoTwo, UnoThree, UnoFour,
     UnoFive, UnoSix, UnoSeven, UnoEight, UnoNine,
-    UnoSkip = 10,
-    UnoReverse = 11,
-    UnoDrawTwo = 12,
-    UnoWildCard = 13,
-    UnoWildDrawFour = 14
+    UnoSkip = 10,         // Пропуск хода
+    UnoReverse = 11,      // Смена направления
+    UnoDrawTwo = 12,      // Возьми две (+2)
+    UnoWildCard = 13,     // Дикая карта смены цвета
+    UnoWildDrawFour = 14  // Дикая карта +4
 };
 
+/**
+ * @brief Структура отдельной игровой карты Уно.
+ */
 struct UnoCard {
     UnoColor color = UnoRed;
     UnoValue value = UnoZero;
@@ -48,16 +57,22 @@ struct UnoCard {
     }
 };
 
+/**
+ * @brief Состояние участника игры в Уно.
+ */
 struct UnoPlayer {
-    int id = 0;
-    QString name;
-    int avatar = 0;
+    int              id = 0;
+    QString          name;
+    int              avatar = 0;
     QVector<UnoCard> hand;
-    bool isBot = false;
-    bool isOut = false;
-    bool saidUno = false;
+    bool             isBot = false;
+    bool             isOut = false;
+    bool             saidUno = false;
 };
 
+/**
+ * @brief Движок правил игры Уно (Изолирован от графики и сети).
+ */
 class UnoEngine : public QObject {
     Q_OBJECT
 public:
@@ -75,8 +90,8 @@ public:
     QString     statusMessage;
     int         myIdx                    = 0;
 
-    int         unoVulnerablePlayerIdx   = -1; // Игрок, которого можно поймать
-    qint64      unoVulnerabilityDeadline = 0;  // Дедлайн окна форы (мс)
+    int         unoVulnerablePlayerIdx   = -1; // Индекс игрока, забывшего сказать "Уно" (в окне уязвимости)
+    qint64      unoVulnerabilityDeadline = 0;  // Время истечения окна форы для выкрика Уно (мс)
 
     UnoDrawMode drawMode                 = UnoDrawMode::DrawUntilMatch;
     bool        stackingEnabled          = true;

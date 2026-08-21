@@ -58,15 +58,15 @@ void NetworkManager::startHostServer(int selectedGameType) {
 
     ConnectedClient host;
     host.id = 0;
-    host.name = AppSettings::instance().nickname;
-    host.avatar = static_cast<int>(AppSettings::instance().avatar);
+    host.name = AppSettings::instance().getNickname();
+    host.avatar = static_cast<int>(AppSettings::instance().getAvatar());
     lobbyClients.append(host);
 
     tcpServer = new QTcpServer(this);
     connect(tcpServer, &QTcpServer::newConnection, this, [this]() {
         QTcpSocket* socket = tcpServer->nextPendingConnection();
 
-        // Поиск освободившегося слота для повторного подключения
+        // Поиск освободившегося слота после отключения
         int slotIdx = -1;
         for (int i = 0; i < clientSockets.size(); ++i) {
             if (clientSockets[i] == nullptr) {
@@ -88,21 +88,21 @@ void NetworkManager::startHostServer(int selectedGameType) {
 
         connect(socket, &QTcpSocket::readyRead, this, &NetworkManager::onNetworkReadHost);
         connect(socket, &QTcpSocket::disconnected, this, [this, socket]() {
-            int idx = clientSockets.indexOf(socket);
+            const int idx = clientSockets.indexOf(socket);
             if (idx != -1) {
                 if (isLobby) {
                     clientSockets.removeAt(idx);
                     if (idx + 1 < lobbyClients.size()) lobbyClients.removeAt(idx + 1);
 
-                    // Оповещаем оставшихся клиентов
                     QJsonObject lobbyJson;
                     lobbyJson["isLobby"]     = isLobby;
                     lobbyJson["gameType"]    = gameType;
                     lobbyJson["playerCount"] = getActiveClientCount() + 1;
                     broadcastJson(lobbyJson);
 
-                    // Обновляем статус у хоста при выходе игрока из лобби
-                    emit lobbyStatusChanged(QString(getLocalizedText("ЛОББИ: %1/%2 игроков. Ожидание...", "LOBBY: %1/%2 players. Waiting...")).arg(getActiveClientCount() + 1).arg(NetConfig::MAX_PLAYERS));
+                    emit lobbyStatusChanged(QString(getLocalizedText("ЛОББИ: %1/%2 игроков. Ожидание...", "LOBBY: %1/%2 players. Waiting..."))
+                    .arg(getActiveClientCount() + 1)
+                    .arg(NetConfig::MAX_PLAYERS));
                 } else {
                     clientSockets[idx] = nullptr;
                     if (idx + 1 < lobbyClients.size()) lobbyClients[idx + 1].isDisconnected = true;
@@ -115,7 +115,7 @@ void NetworkManager::startHostServer(int selectedGameType) {
         });
     });
 
-    if (!tcpServer->listen(QHostAddress::Any, AppSettings::instance().serverPort)) {
+    if (!tcpServer->listen(QHostAddress::Any, AppSettings::instance().getServerPort())) {
         emit lobbyStatusChanged(getLocalizedText("Ошибка: не удалось запустить сервер!", "Error: Failed to start server!"));
     }
 }
@@ -138,16 +138,18 @@ void NetworkManager::connectToHost(const QString& ip, int mySelectedGameType) {
 
         QJsonObject joinJson;
         joinJson["action"] = "JOIN";
-        joinJson["name"]   = AppSettings::instance().nickname;
-        joinJson["avatar"] = static_cast<int>(AppSettings::instance().avatar);
+        joinJson["name"]   = AppSettings::instance().getNickname();
+        joinJson["avatar"] = static_cast<int>(AppSettings::instance().getAvatar());
         sendJsonToServer(joinJson);
     });
 
     auto handleDisconnect = [this]() {
-        if (!isNetworkGame || isHost) return; // Игнорируем вызов, если сеть уже сброшена
+        if (!isNetworkGame || isHost) return;
 
-        bool wasInSession = isSessionActive;
-        QString msg = wasInSession ? getLocalizedText("Связь с сервером потеряна! Хост отключился.", "Connection lost! Host disconnected.") : getLocalizedText("Ошибка: Сервер не найден или лобби не существует!", "Error: Server not found or lobby does not exist!");
+        const bool wasInSession = isSessionActive;
+        const QString msg = wasInSession
+        ? getLocalizedText("Связь с сервером потеряна! Хост отключился.", "Connection lost! Host disconnected.")
+        : getLocalizedText("Ошибка: Сервер не найден или лобби не существует!", "Error: Server not found or lobby does not exist!");
 
         isLobby = false;
         disconnectAll();
@@ -165,12 +167,12 @@ void NetworkManager::connectToHost(const QString& ip, int mySelectedGameType) {
         handleDisconnect();
     });
 
-    tcpSocket->connectToHost(ip, AppSettings::instance().serverPort);
+    tcpSocket->connectToHost(ip, AppSettings::instance().getServerPort());
 }
 
 void NetworkManager::broadcastJson(const QJsonObject& json) {
     if (!isHost) return;
-    QByteArray data = QJsonDocument(json).toJson(QJsonDocument::Compact) + "\n";
+    const QByteArray data = QJsonDocument(json).toJson(QJsonDocument::Compact) + "\n";
     for (auto* socket : clientSockets) {
         if (socket && socket->state() == QAbstractSocket::ConnectedState) {
             socket->write(data);
@@ -199,17 +201,16 @@ void NetworkManager::onNetworkReadHost() {
     if (!senderSocket) return;
 
     while (senderSocket->canReadLine()) {
-        QByteArray line = senderSocket->readLine();
-        QJsonDocument doc = QJsonDocument::fromJson(line);
+        const QByteArray line = senderSocket->readLine();
+        const QJsonDocument doc = QJsonDocument::fromJson(line);
         if (!doc.isObject()) continue;
-        QJsonObject json = doc.object();
+        const QJsonObject json = doc.object();
 
         if (json["action"].toString() == "JOIN") {
             QString cName = json["name"].toString().trimmed();
-            int cAvatar = json["avatar"].toInt(0);
+            const int cAvatar = json["avatar"].toInt(0);
             if (cName.isEmpty()) cName = getLocalizedText("Игрок", "Player");
 
-            // Проверяем всех участников
             int existingIdx = -1;
             for (int i = 0; i < lobbyClients.size(); ++i) {
                 if (lobbyClients[i].name == cName) {
@@ -218,7 +219,6 @@ void NetworkManager::onNetworkReadHost() {
                 }
             }
 
-            // Если имя совпало с хостом или с уже подключенным игроком — отклоняем новичка
             if (existingIdx == 0 || (existingIdx != -1 && (isLobby || !lobbyClients[existingIdx].isDisconnected))) {
                 QJsonObject errJson;
                 errJson["error"] = true;
@@ -229,9 +229,8 @@ void NetworkManager::onNetworkReadHost() {
                 return;
             }
 
-            // Легитимный реконнект отключившегося клиента посреди матча
             if (existingIdx > 0) {
-                int socketSlot = existingIdx - 1;
+                const int socketSlot = existingIdx - 1;
                 if (socketSlot < clientSockets.size()) {
                     auto* oldSocket = clientSockets[socketSlot];
                     if (oldSocket && oldSocket != senderSocket) {
@@ -250,7 +249,7 @@ void NetworkManager::onNetworkReadHost() {
                     clientSockets.append(senderSocket);
                     clientIdx = clientSockets.size() - 1;
                 }
-                int playerId = clientIdx + 1;
+                const int playerId = clientIdx + 1;
                 while (lobbyClients.size() <= playerId) {
                     ConnectedClient cl;
                     cl.id = lobbyClients.size();
@@ -269,7 +268,9 @@ void NetworkManager::onNetworkReadHost() {
             broadcastJson(lobbyJson);
 
             if (isLobby) {
-                emit lobbyStatusChanged(QString(getLocalizedText("ЛОББИ: %1/%2 игроков. Ожидание...", "LOBBY: %1/%2 players. Waiting...")).arg(getActiveClientCount() + 1).arg(NetConfig::MAX_PLAYERS));
+                emit lobbyStatusChanged(QString(getLocalizedText("ЛОББИ: %1/%2 игроков. Ожидание...", "LOBBY: %1/%2 players. Waiting..."))
+                .arg(getActiveClientCount() + 1)
+                .arg(NetConfig::MAX_PLAYERS));
             }
 
             if (!isLobby) {
@@ -278,7 +279,7 @@ void NetworkManager::onNetworkReadHost() {
             continue;
         }
 
-        int clientIdx = clientSockets.indexOf(senderSocket);
+        const int clientIdx = clientSockets.indexOf(senderSocket);
         if (clientIdx == -1) continue;
         emit signalNetworkDataReceived(clientIdx + 1, json);
     }
@@ -286,29 +287,34 @@ void NetworkManager::onNetworkReadHost() {
 
 void NetworkManager::onNetworkReadClient() {
     while (tcpSocket && tcpSocket->canReadLine()) {
-        QByteArray line = tcpSocket->readLine();
-        QJsonDocument doc = QJsonDocument::fromJson(line);
+        const QByteArray line = tcpSocket->readLine();
+        const QJsonDocument doc = QJsonDocument::fromJson(line);
         if (!doc.isObject()) continue;
-        QJsonObject json = doc.object();
+        const QJsonObject json = doc.object();
 
         isSessionActive = true;
 
-        // Обработка ошибки от сервера (например, занятый ник)
         if (json.contains("error") && json["error"].toBool()) {
-            QString errMsg = json["message"].toString();
+            const QString errMsg = json["message"].toString();
             isLobby = false;
             disconnectAll();
             emit lobbyStatusChanged(errMsg);
             return;
         }
 
-        int serverGameType = json["gameType"].toInt();
+        const int serverGameType = json["gameType"].toInt();
         if (serverGameType != selectedClientGameType) {
-            static const QString gameNames[] = { getLocalizedText("Покера", "Poker"), getLocalizedText("Дурака", "Durak"), getLocalizedText("Козла", "Kozel"), getLocalizedText("Уно", "UNO") };
-            QString myGame = gameNames[std::clamp(selectedClientGameType, 0, 3)];
-            QString serverGame = gameNames[std::clamp(serverGameType, 0, 3)];
+            static const QString gameNames[] = {
+                getLocalizedText("Покера", "Poker"),
+                getLocalizedText("Дурака", "Durak"),
+                getLocalizedText("Козла", "Kozel"),
+                getLocalizedText("Уно", "UNO")
+            };
+            const QString myGame = gameNames[std::clamp(selectedClientGameType, 0, 3)];
+            const QString serverGame = gameNames[std::clamp(serverGameType, 0, 3)];
 
-            QString errorMsg = QString(getLocalizedText("Ошибка: Вы выбрали %1, а это лобби %2!", "Error: You selected %1, but this is a %2 lobby!")).arg(myGame, serverGame);
+            const QString errorMsg = QString(getLocalizedText("Ошибка: Вы выбрали %1, а это лобби %2!", "Error: You selected %1, but this is a %2 lobby!"))
+            .arg(myGame, serverGame);
 
             isLobby = false;
             disconnectAll();
@@ -318,9 +324,16 @@ void NetworkManager::onNetworkReadClient() {
 
         isLobby = json["isLobby"].toBool();
         if (isLobby) {
-            int count = json["playerCount"].toInt();
-            static const QString gameNames[] = { getLocalizedText("ПОКЕРА", "POKER"), getLocalizedText("ДУРАКА", "DURAK"), getLocalizedText("КОЗЛА", "KOZEL"), getLocalizedText("УНО", "UNO") };
-            emit lobbyStatusChanged(QString(getLocalizedText("ЛОББИ (%1): %2/4 игроков. Ожидание старта...", "LOBBY (%1): %2/4 players. Waiting to start...")).arg(gameNames[serverGameType]).arg(count));
+            const int count = json["playerCount"].toInt();
+            static const QString gameNames[] = {
+                getLocalizedText("ПОКЕРА", "POKER"),
+                getLocalizedText("ДУРАКА", "DURAK"),
+                getLocalizedText("КОЗЛА", "KOZEL"),
+                getLocalizedText("УНО", "UNO")
+            };
+            emit lobbyStatusChanged(QString(getLocalizedText("ЛОББИ (%1): %2/4 игроков. Ожидание старта...", "LOBBY (%1): %2/4 players. Waiting to start..."))
+            .arg(gameNames[serverGameType])
+            .arg(count));
             continue;
         }
 

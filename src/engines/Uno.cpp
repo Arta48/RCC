@@ -4,7 +4,7 @@
 void UnoEngine::createDeck() {
     deck.clear();
     for (int c = 0; c < 4; ++c) {
-        UnoColor color = static_cast<UnoColor>(c);
+        const UnoColor color = static_cast<UnoColor>(c);
         deck.append(UnoCard{ color, UnoZero });
         for (int i = 0; i < 2; ++i) {
             for (int v = UnoOne; v <= UnoNine; ++v)
@@ -19,19 +19,19 @@ void UnoEngine::createDeck() {
         deck.append(UnoCard{ UnoWild, UnoWildDrawFour });
     }
     for (int i = deck.size() - 1; i > 0; --i) {
-        int j = QRandomGenerator::global()->bounded(i + 1);
+        const int j = QRandomGenerator::global()->bounded(i + 1);
         deck.swapItemsAt(i, j);
     }
 }
 
 void UnoEngine::replenishDeckIfNeeded() {
     if (deck.size() < 5 && discardPile.size() > 1) {
-        UnoCard top = discardPile.takeLast();
+        const UnoCard top = discardPile.takeLast();
         while (!discardPile.isEmpty()) {
             deck.append(discardPile.takeFirst());
         }
         for (int i = deck.size() - 1; i > 0; --i) {
-            int j = QRandomGenerator::global()->bounded(i + 1);
+            const int j = QRandomGenerator::global()->bounded(i + 1);
             deck.swapItemsAt(i, j);
         }
         discardPile.append(top);
@@ -50,13 +50,13 @@ void UnoEngine::initGame(int oppCount, bool netGame) {
     players.clear();
     myIdx                    = 0;
 
-    drawMode        = AppSettings::instance().unoDrawMode;
-    stackingEnabled = AppSettings::instance().unoStacking;
+    drawMode        = AppSettings::instance().getUnoDrawMode();
+    stackingEnabled = AppSettings::instance().getUnoStacking();
 
     UnoPlayer human;
     human.id = 0;
-    human.name = AppSettings::instance().nickname;
-    human.avatar = static_cast<int>(AppSettings::instance().avatar);
+    human.name = AppSettings::instance().getNickname();
+    human.avatar = static_cast<int>(AppSettings::instance().getAvatar());
     human.isBot = false;
     human.saidUno = false;
     players.append(human);
@@ -81,18 +81,18 @@ void UnoEngine::initGame(int oppCount, bool netGame) {
         }
     }
 
-    // 1. ОФИЦИАЛЬНЫЕ ПРАВИЛА ПЕРВОЙ КАРТЫ СБРОСА
+    // Официальные правила определения первой карты на столе
     while (!deck.isEmpty()) {
-        UnoCard top = deck.takeFirst();
+        const UnoCard top = deck.takeFirst();
         if (top.value == UnoWildDrawFour) {
-            deck.append(top); // Wild +4 нельзя открывать первым — замешиваем обратно
+            deck.append(top);
             continue;
         }
         discardPile.append(top);
         break;
     }
 
-    UnoCard firstCard = discardPile.last();
+    const UnoCard firstCard = discardPile.last();
     if (firstCard.color == UnoWild) {
         currentColor = static_cast<UnoColor>(QRandomGenerator::global()->bounded(4));
         currentTurnIdx = 0;
@@ -141,14 +141,14 @@ bool UnoEngine::playCard(int playerIdx, int cardHandIdx, UnoColor chosenColor, b
     auto& hand = players[playerIdx].hand;
     if (cardHandIdx < 0 || cardHandIdx >= hand.size()) return false;
 
-    UnoCard card = hand[cardHandIdx];
+    const UnoCard card = hand[cardHandIdx];
     if (!canPlayCard(card)) return false;
 
     hand.removeAt(cardHandIdx);
     discardPile.append(card);
     AudioManager::instance().playSound(SoundEffect::CardPlace);
 
-    // 2. ОБРАБОТКА ФОРЫ И ВЫКРИКА "УНО!"
+    // Механика форы при переходе на 1 карту и выкрика "Уно"
     if (hand.size() == 1) {
         if (callUno) {
             players[playerIdx].saidUno = true;
@@ -159,7 +159,7 @@ bool UnoEngine::playCard(int playerIdx, int cardHandIdx, UnoColor chosenColor, b
         } else {
             players[playerIdx].saidUno = false;
             unoVulnerablePlayerIdx = playerIdx;
-            unoVulnerabilityDeadline = QDateTime::currentMSecsSinceEpoch() + 3000; // Окно форы 3 секунды
+            unoVulnerabilityDeadline = QDateTime::currentMSecsSinceEpoch() + 3000;
         }
     } else {
         players[playerIdx].saidUno = false;
@@ -179,7 +179,7 @@ bool UnoEngine::playCard(int playerIdx, int cardHandIdx, UnoColor chosenColor, b
     checkWinCondition();
     if (gameOver) return true;
 
-    int n = players.size();
+    const int n = players.size();
     if (card.value == UnoReverse) {
         direction = -direction;
         advanceTurn(n == 2 ? 2 : 1);
@@ -190,7 +190,7 @@ bool UnoEngine::playCard(int playerIdx, int cardHandIdx, UnoColor chosenColor, b
             accumulatedPenalty += 2;
             advanceTurn(1);
         } else {
-            int nextP = getNextActivePlayer(currentTurnIdx, 1);
+            const int nextP = getNextActivePlayer(currentTurnIdx, 1);
             replenishDeckIfNeeded();
             for (int i = 0; i < 2 && !deck.isEmpty(); ++i) players[nextP].hand.append(deck.takeFirst());
             advanceTurn(2);
@@ -200,7 +200,7 @@ bool UnoEngine::playCard(int playerIdx, int cardHandIdx, UnoColor chosenColor, b
             accumulatedPenalty += 4;
             advanceTurn(1);
         } else {
-            int nextP = getNextActivePlayer(currentTurnIdx, 1);
+            const int nextP = getNextActivePlayer(currentTurnIdx, 1);
             replenishDeckIfNeeded();
             for (int i = 0; i < 4 && !deck.isEmpty(); ++i) players[nextP].hand.append(deck.takeFirst());
             advanceTurn(2);
@@ -305,8 +305,8 @@ bool UnoEngine::catchUno(int catcherIdx, int targetIdx) {
         AudioManager::instance().playSound(SoundEffect::Lose);
         statusMessage = QString(getLocalizedText("%1 пойман без УНО! (+2 карты штрафа)",
                                                  "%1 caught without UNO! (+2 penalty cards)")).arg(target.name);
-        emit stateChanged();
-        return true;
+                                                 emit stateChanged();
+                                                 return true;
     }
     return false;
 }
@@ -320,7 +320,7 @@ bool UnoEngine::hasPlayableCard(int playerIdx) const {
 }
 
 int UnoEngine::getNextActivePlayer(int current, int step) {
-    int n = players.size();
+    const int n = players.size();
     int next = current;
     for (int s = 0; s < step; ++s) {
         for (int i = 1; i <= n; ++i) {
@@ -357,9 +357,9 @@ void UnoEngine::checkWinCondition() {
 bool UnoEngine::makeAiMove() {
     if (isProcessingMove || gameOver || currentTurnIdx >= players.size() || !players[currentTurnIdx].isBot) return false;
 
-    // Честная ловля ботом: бот выжидает 1.5 - 2 секунды из 3-секундного окна форы
+    // Честная ловля ботом: выжидание 1.8 секунды из 3-секундного окна
     if (unoVulnerablePlayerIdx >= 0 && unoVulnerablePlayerIdx != currentTurnIdx) {
-        qint64 now = QDateTime::currentMSecsSinceEpoch();
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
         if (now >= unoVulnerabilityDeadline - 1200) {
             if (QRandomGenerator::global()->bounded(100) < 80) {
                 catchUno(currentTurnIdx, unoVulnerablePlayerIdx);
@@ -395,7 +395,7 @@ bool UnoEngine::makeAiMove() {
             chosenColor = static_cast<UnoColor>(bestColor);
         }
 
-        bool callUno = (hand.size() == 2) && (QRandomGenerator::global()->bounded(100) < 85);
+        const bool callUno = (hand.size() == 2) && (QRandomGenerator::global()->bounded(100) < 85);
         playCard(currentTurnIdx, bestIdx, chosenColor, callUno);
         isProcessingMove = false;
         return true;
@@ -412,7 +412,7 @@ bool UnoEngine::makeAiMove() {
         if (!hand.isEmpty() && canPlayCard(hand.last())) {
             UnoColor chosenColor = UnoRed;
             if (hand.last().color == UnoWild) chosenColor = UnoBlue;
-            bool callUno = (hand.size() == 2) && (QRandomGenerator::global()->bounded(100) < 85);
+            const bool callUno = (hand.size() == 2) && (QRandomGenerator::global()->bounded(100) < 85);
             playCard(currentTurnIdx, hand.size() - 1, chosenColor, callUno);
         }
         isProcessingMove = false;
@@ -423,7 +423,7 @@ bool UnoEngine::makeAiMove() {
             if (!hand.isEmpty() && canPlayCard(hand.last())) {
                 UnoColor chosenColor = UnoRed;
                 if (hand.last().color == UnoWild) chosenColor = UnoBlue;
-                bool callUno = (hand.size() == 2) && (QRandomGenerator::global()->bounded(100) < 85);
+                const bool callUno = (hand.size() == 2) && (QRandomGenerator::global()->bounded(100) < 85);
                 playCard(currentTurnIdx, hand.size() - 1, chosenColor, callUno);
             } else {
                 passTurn(currentTurnIdx);
@@ -440,10 +440,14 @@ bool UnoEngine::makeAiMove() {
 
 void UnoEngine::updateStatus() {
     if (gameOver) return;
-    static const QString colNames[] = { getLocalizedText("Красный", "Red"), getLocalizedText("Жёлтый", "Yellow"), getLocalizedText("Зелёный", "Green"), getLocalizedText("Синий", "Blue") };
-    QString colorTxt = colNames[currentColor];
-
-    QString penaltySuffix = (accumulatedPenalty > 0) ? QString(getLocalizedText(" [ШТРАФ: +%1]", " [PENALTY: +%1]")).arg(accumulatedPenalty) : "";
+    static const QString colNames[] = {
+        getLocalizedText("Красный", "Red"),
+        getLocalizedText("Жёлтый", "Yellow"),
+        getLocalizedText("Зелёный", "Green"),
+        getLocalizedText("Синий", "Blue")
+    };
+    const QString colorTxt = colNames[currentColor];
+    const QString penaltySuffix = (accumulatedPenalty > 0) ? QString(getLocalizedText(" [ШТРАФ: +%1]", " [PENALTY: +%1]")).arg(accumulatedPenalty) : "";
 
     if (currentTurnIdx == myIdx) {
         statusMessage = QString(getLocalizedText("Ваш ход! Цвет: %1%2", "Your turn! Color: %1%2")).arg(colorTxt, penaltySuffix);
@@ -461,7 +465,7 @@ void UnoEngine::handlePlayerReconnect(int pIdx) {
 
 void UnoEngine::handlePlayerDisconnect(int pIdx) {
     if (pIdx < 0 || pIdx >= players.size()) return;
-    QString discName = players[pIdx].name;
+    const QString discName = players[pIdx].name;
     players.removeAt(pIdx);
     for (int i = 0; i < players.size(); ++i) players[i].id = i;
     if (currentTurnIdx >= players.size()) currentTurnIdx = 0;
@@ -487,15 +491,13 @@ QJsonObject UnoEngine::toJson(int targetId) const {
     json["statusMessage"]            = statusMessage;
     json["deckSize"]                 = deck.size();
 
-    // Синхронизация правил хоста
     json["drawMode"]                 = static_cast<int>(drawMode);
     json["stackingEnabled"]          = stackingEnabled;
     json["unoVulnerablePlayerIdx"]   = unoVulnerablePlayerIdx;
     json["unoVulnerabilityDeadline"] = unoVulnerabilityDeadline;
 
-    // Синхронизация последних карт сброса для 3D-эффекта стопки
     QJsonArray discardArr;
-    int startIdx = qMax(0, discardPile.size() - 5);
+    const int startIdx = qMax(0, discardPile.size() - 5);
     for (int i = startIdx; i < discardPile.size(); ++i) {
         discardArr.append(discardPile[i].toJson());
     }
@@ -553,20 +555,20 @@ void UnoEngine::fromJson(const QJsonObject& json) {
         discardPile.append(UnoCard::fromJson(json["topCard"].toObject()));
     }
 
-    QJsonArray pArr = json["players"].toArray();
+    const QJsonArray pArr = json["players"].toArray();
     players.resize(pArr.size());
     for (int i = 0; i < pArr.size(); ++i) {
-        QJsonObject pObj = pArr[i].toObject();
-        players[i].id     = pObj["id"].toInt();
-        players[i].name   = pObj["name"].toString();
-        players[i].avatar = pObj["avatar"].toInt(0);
-        players[i].isBot  = pObj["isBot"].toBool();
-        players[i].isOut  = pObj["isOut"].toBool();
-        players[i].saidUno= pObj["saidUno"].toBool(false);
+        const QJsonObject pObj = pArr[i].toObject();
+        players[i].id      = pObj["id"].toInt();
+        players[i].name    = pObj["name"].toString();
+        players[i].avatar  = pObj["avatar"].toInt(0);
+        players[i].isBot   = pObj["isBot"].toBool();
+        players[i].isOut   = pObj["isOut"].toBool();
+        players[i].saidUno = pObj["saidUno"].toBool(false);
 
-        int handSize = pObj["handSize"].toInt();
+        const int handSize = pObj["handSize"].toInt();
         players[i].hand.clear();
-        QJsonArray handArr = pObj["hand"].toArray();
+        const QJsonArray handArr = pObj["hand"].toArray();
         if (!handArr.isEmpty()) {
             for (auto v : handArr) players[i].hand.append(UnoCard::fromJson(v.toObject()));
         } else {

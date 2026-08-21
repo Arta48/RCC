@@ -10,7 +10,7 @@
 #include "Poker.h"
 
 /**
- * @brief Структура пары карт на игровом столе Дурака (Атака и Защита).
+ * @brief Структура пары карт на столе Подкидного Дурака (Карта атаки и Карта защиты).
  */
 struct DurakTablePair {
     Card attack;
@@ -22,16 +22,16 @@ struct DurakTablePair {
  * @brief Состояние участника игры в Дурака.
  */
 struct DurakPlayer {
-    int id = 0;
-    QString name;
-    int avatar = 0;
+    int           id = 0;
+    QString       name;
+    int           avatar = 0;
     QVector<Card> hand;
-    bool isBot = false;
-    bool isOut = false;
+    bool          isBot = false;
+    bool          isOut = false;
 };
 
 /**
- * @brief Движок правил игры Подкидной Дурак (Изолированный от сети).
+ * @brief Движок правил игры Подкидной Дурак (Изолирован от графики и сети).
  */
 class DurakEngine : public QObject {
     Q_OBJECT
@@ -47,7 +47,7 @@ public:
     int     currentTurnIdx   = 0;
     bool    isDefenderTaking = false;
     bool    gameOver         = false;
-    bool    isProcessingMove = false; // Защита от состояния гонки таймеров ИИ
+    bool    isProcessingMove = false;
     QString statusMessage;
     int     myIdx            = 0;
 

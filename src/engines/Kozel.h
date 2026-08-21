@@ -16,30 +16,30 @@ int getKozelCardPoints(int rank);
  * @brief Состояние участника игры в Козла.
  */
 struct KozelPlayer {
-    int id = 0;
-    QString name;
-    int avatar = 0;
+    int           id = 0;
+    QString       name;
+    int           avatar = 0;
     QVector<Card> hand;
-    int pointsCollected = 0;
-    bool isBot = false;
-    bool isOut = false;
+    int           pointsCollected = 0;
+    bool          isBot = false;
+    bool          isOut = false;
 };
 
 /**
- * @brief Движок правил карточной игры Козёл (Изолированный от сети).
+ * @brief Движок правил игры Козёл (Изолирован от графики и сети).
  */
 class KozelEngine : public QObject {
     Q_OBJECT
 public:
-    QVector<Card>              deck;
-    Suit                       trumpSuit = Hearts;
-    QVector<KozelPlayer>       players;
-    QVector<QPair<int, Card>>  currentTrick;
+    QVector<Card>             deck;
+    Suit                      trumpSuit = Hearts;
+    QVector<KozelPlayer>      players;
+    QVector<QPair<int, Card>> currentTrick;
 
     int     leadPlayerIdx    = 0;
     int     currentTurnIdx   = 0;
     bool    gameOver         = false;
-    bool    isProcessingMove = false; // Защита от состояния гонки таймеров ИИ
+    bool    isProcessingMove = false;
     QString statusMessage;
     int     myIdx            = 0;
 
