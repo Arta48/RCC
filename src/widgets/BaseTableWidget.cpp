@@ -182,6 +182,10 @@ void BaseTableWidget::drawCard(QPainter& p, const QRect& rect, const Card* card,
     static const QString suitsStr[] = { "♥", "♦", "♣", "♠" };
     static const QString ranksStr[] = { "", "", "2", "3", "4", "5", "6", "7", "8", "9", "10", getLocalizedText("В", "J"), getLocalizedText("Д", "Q"), getLocalizedText("К", "K"), getLocalizedText("Т", "A") };
 
+    // Защита границ массивов через qBound
+    const int safeSuit = qBound(0, static_cast<int>(card->suit), 3);
+    const int safeRank = qBound(0, card->rank, 14);
+
     const QString suitTxt = suitsStr[card->suit];
     const QString rankTxt = ranksStr[card->rank];
 

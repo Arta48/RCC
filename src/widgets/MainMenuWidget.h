@@ -29,6 +29,7 @@ public:
     TouchComboBox* comboBots;
     QPushButton*   btnStartBotGame;
     QPushButton*   btnHostServer;
+    QPushButton*   btnScanLan; // Кнопка поиска лобби в LAN
     QPushButton*   btnConnectIP;
     QPushButton*   btnSettings;
     QPushButton*   btnRules;

@@ -67,5 +67,9 @@
                 <true/>
             </dict>
         </dict>
+
+        <!-- Разрешение на поиск и создание комнат в локальной сети (iOS 14+) -->
+        <key>NSLocalNetworkUsageDescription</key>
+        <string>Royal Card Club uses the local network to discover and host multiplayer game lobbies.</string>
     </dict>
 </plist>

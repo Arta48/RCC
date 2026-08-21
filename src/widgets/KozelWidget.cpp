@@ -80,11 +80,11 @@ void KozelWidget::handleAiLogic() {
 void KozelWidget::updateUI() {
     if (engine.gameOver) {
         lblStatus->setText(engine.statusMessage);
-    } else if (engine.myIdx < engine.players.size() && engine.players[engine.myIdx].isOut) {
+    } else if (engine.myIdx >= 0 && engine.myIdx < engine.players.size() && engine.players[engine.myIdx].isOut) {
         lblStatus->setText(getLocalizedText("Вы зашли во время игры. Ожидание следующего раунда...", "You joined mid-game. Waiting for next round..."));
     } else if (engine.statusMessage.contains(getLocalizedText("забирает взятку", "takes trick"))) {
         const QString winnerName = engine.statusMessage.section(getLocalizedText(" забирает взятку", " takes trick"), 0, 0);
-        if (engine.myIdx < engine.players.size() && winnerName == engine.players[engine.myIdx].name) {
+        if (engine.myIdx >= 0 && engine.myIdx < engine.players.size() && winnerName == engine.players[engine.myIdx].name) {
             const int pts = engine.statusMessage.section('+', 1).section(' ', 0, 0).toInt();
             lblStatus->setText(QString(getLocalizedText("Вы забираете взятку (+%1 очков) и ходите!", "You take the trick (+%1 pts) and lead!")).arg(pts));
         } else {
@@ -93,8 +93,10 @@ void KozelWidget::updateUI() {
     } else {
         if (engine.currentTurnIdx == engine.myIdx) {
             lblStatus->setText(getLocalizedText("Ваш ход! Заходите любой картой.", "Your turn! Lead with any card."));
-        } else {
+        } else if (engine.currentTurnIdx >= 0 && engine.currentTurnIdx < engine.players.size()) {
             lblStatus->setText(QString(getLocalizedText("Ход игрока %1", "%1's turn")).arg(engine.players[engine.currentTurnIdx].name));
+        } else {
+            lblStatus->setText(engine.statusMessage);
         }
     }
 
@@ -104,9 +106,10 @@ void KozelWidget::updateUI() {
 
     const int activeClients = netManager ? netManager->getActiveClientCount() : 0;
     const bool isHostOrSolo = (!netManager || !netManager->isNetworkGame || netManager->isHost);
+    const bool isError = engine.statusMessage.contains(getLocalizedText("Ошибка", "Error")) || engine.statusMessage.contains(getLocalizedText("потеряна", "lost"));
 
     btnPlayCards->setVisible(engine.currentTurnIdx == engine.myIdx && !selectedHandCardIndices.isEmpty() && !engine.gameOver);
-    btnNextHand->setVisible(engine.gameOver && isHostOrSolo);
+    btnNextHand->setVisible(engine.gameOver && isHostOrSolo && !isError); // Кнопка "Играть заново" скрыта при ошибке разрыва связи
 
     if (netManager && netManager->isNetworkGame && netManager->isHost) {
         if (activeClients == 0) {
@@ -299,6 +302,8 @@ void KozelWidget::paintEvent(QPaintEvent*) {
 
 void KozelWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
     const int numPlayers = engine.players.size();
+    if (numPlayers <= 0) return; // Защита от деления на 0
+
     const qreal s = getScale();
     const QVector<QPoint> seatPos = getSeatPositions(numPlayers, width(), height(), qRound(75 * s), qRound(80 * s));
 

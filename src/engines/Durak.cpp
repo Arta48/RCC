@@ -268,7 +268,7 @@ void DurakEngine::checkWinCondition() {
         }
 
         if (durakIdx != -1) {
-            statusMessage = QString(getLocalizedText("Игра окончена! %1 — ДУРАК!", "Game over! %1 is the DURAK!")).arg(players[durakIdx].name);
+            statusMessage = QString(getLocalizedText("Игра окончена! %1 - ДУРАК!", "Game over! %1 is the DURAK!")).arg(players[durakIdx].name);
         } else {
             statusMessage = getLocalizedText("Игра окончена! Ничья!", "Game over! Draw!");
         }

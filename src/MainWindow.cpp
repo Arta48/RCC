@@ -3,6 +3,7 @@
 #include "Audio.h"
 #include "dialogs/SettingsDialog.h"
 #include "dialogs/RulesDialog.h"
+#include "dialogs/LanLobbiesDialog.h"
 
 #include <QVBoxLayout>
 
@@ -174,28 +175,77 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     });
 
     // =========================================================================
+    // КНОПКИ ГЛАВНОГО МЕНЮ: ПОИСК ЛОББИ В СЕТИ
+    // =========================================================================
+    connect(menuWidget->btnScanLan, &QPushButton::clicked, this, [this]() {
+        AudioManager::instance().playSound(SoundEffect::ButtonClick);
+
+        LanLobbiesDialog dialog(netManager, this);
+        if (dialog.exec() == QDialog::Accepted) {
+            const DiscoveredLobby lobby = dialog.getSelectedLobby();
+            if (!lobby.ip.isEmpty()) {
+                // Остановка таймеров ИИ
+                pokerWidget->aiTimer->stop();
+                durakWidget->aiTimer->stop();
+                kozelWidget->aiTimer->stop();
+                unoWidget->aiTimer->stop();
+
+                // Очистка старых сообщений и ошибок
+                pokerWidget->engine.gameOver = false;
+                pokerWidget->engine.statusMessage.clear();
+                pokerWidget->lblStatus->setText(getLocalizedText("Подключение к серверу...", "Connecting to server..."));
+
+                durakWidget->engine.gameOver = false;
+                durakWidget->engine.statusMessage.clear();
+                kozelWidget->engine.gameOver = false;
+                kozelWidget->engine.statusMessage.clear();
+                unoWidget->engine.gameOver = false;
+                unoWidget->engine.statusMessage.clear();
+
+                // Подключение
+                netManager->connectToHost(lobby.ip, lobby.gameType, lobby.port);
+
+                pokerWidget->updateUI();
+                stackedWidget->setCurrentIndex(1);
+            }
+        }
+    });
+
+
+    // =========================================================================
     // КНОПКИ ГЛАВНОГО МЕНЮ: ПОДКЛЮЧЕНИЕ ПО IP (КЛИЕНТ)
     // =========================================================================
     connect(menuWidget->btnConnectIP, &QPushButton::clicked, this, [this]() {
+        // Остановка таймеров ИИ
         pokerWidget->aiTimer->stop();
         durakWidget->aiTimer->stop();
         kozelWidget->aiTimer->stop();
         unoWidget->aiTimer->stop();
 
+        // Очистка данных и установка статуса подключения
         pokerWidget->engine.players.clear();
         pokerWidget->engine.communityCards.clear();
         pokerWidget->engine.pot = 0;
         pokerWidget->engine.gameOver = false;
         pokerWidget->engine.statusMessage.clear();
+        pokerWidget->lblStatus->setText(getLocalizedText("Подключение к серверу...", "Connecting to server..."));
 
         durakWidget->engine.players.clear();
         durakWidget->engine.table.clear();
         durakWidget->engine.gameOver = false;
+        durakWidget->engine.statusMessage.clear();
 
         kozelWidget->engine.players.clear();
         kozelWidget->engine.currentTrick.clear();
         kozelWidget->engine.gameOver = false;
+        kozelWidget->engine.statusMessage.clear();
 
+        unoWidget->engine.players.clear();
+        unoWidget->engine.discardPile.clear();
+        unoWidget->engine.gameOver = false;
+        unoWidget->engine.statusMessage.clear();
+
+        // Подключение по введенному адресу
         const int gameType = menuWidget->comboGameType->currentData().toInt();
         netManager->connectToHost(menuWidget->ipInput->text().trimmed(), gameType);
 
@@ -340,14 +390,20 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
             pokerWidget->engine.players[0].currentBet = 0;
             pokerWidget->engine.players[0].hasFolded = false;
 
+            // Безопасно закрываем сокеты отключенных клиентов
             for (auto* s : netManager->clientSockets) {
                 if (s) {
                     s->abort();
-                    s->disconnect();
                     s->deleteLater();
                 }
             }
             netManager->clientSockets.clear();
+
+            // Сбрасываем список участников лобби, оставляя только хоста
+            if (!netManager->lobbyClients.isEmpty()) {
+                netManager->lobbyClients.resize(1);
+                netManager->lobbyClients[0].isDisconnected = false;
+            }
 
             durakWidget->engine.gameOver = false;
             durakWidget->engine.players.clear();
@@ -356,6 +412,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
             kozelWidget->engine.gameOver = false;
             kozelWidget->engine.players.clear();
             kozelWidget->engine.currentTrick.clear();
+
+            unoWidget->engine.gameOver = false;
+            unoWidget->engine.players.clear();
+            unoWidget->engine.discardPile.clear();
 
             static const QString gameNames[] = {
                 getLocalizedText("ПОКЕРА", "POKER"),

@@ -89,7 +89,7 @@ void TouchComboBox::showPopup() {
     const int popupW = width();
     const int popupH = m_popupOverlay->sizeHint().height();
 
-    // Если всплывающее меню выходит за нижний край экрана — открываем его над кнопкой
+    // Если всплывающее меню выходит за нижний край экрана - открываем его над кнопкой
     if (posInWin.y() + popupH > topWin->height() - 10) {
         posInWin.setY(mapTo(topWin, QPoint(0, -popupH - 3)).y());
     }

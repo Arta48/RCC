@@ -197,7 +197,7 @@ void UnoWidget::handleAiLogic() {
 
 void UnoWidget::updateUI() {
     const bool isMyTurn = (engine.currentTurnIdx == engine.myIdx && !engine.gameOver);
-    const bool hasMove = (engine.myIdx < engine.players.size()) && engine.hasPlayableCard(engine.myIdx);
+    const bool hasMove = (engine.myIdx >= 0 && engine.myIdx < engine.players.size()) && engine.hasPlayableCard(engine.myIdx);
 
     if (engine.accumulatedPenalty > 0) {
         btnDrawCard->setText(QString(getLocalizedText("ВЗЯТЬ ШТРАФ (+%1)", "TAKE PENALTY (+%1)")).arg(engine.accumulatedPenalty));
@@ -209,7 +209,7 @@ void UnoWidget::updateUI() {
         btnPass->setVisible(isMyTurn && engine.hasDrawnThisTurn && engine.drawMode == UnoDrawMode::DrawOne);
     }
 
-    if (engine.myIdx < engine.players.size()) {
+    if (engine.myIdx >= 0 && engine.myIdx < engine.players.size()) {
         const int handCount = engine.players[engine.myIdx].hand.size();
         const bool isVulnerable = (engine.unoVulnerablePlayerIdx == engine.myIdx);
         btnUno->setVisible((isMyTurn && handCount <= 2 && hasMove && !engine.players[engine.myIdx].saidUno) || isVulnerable);
@@ -228,7 +228,8 @@ void UnoWidget::updateUI() {
 
     const int activeClients = netManager ? netManager->getActiveClientCount() : 0;
     const bool isHostOrSolo = (!netManager || !netManager->isNetworkGame || netManager->isHost);
-    btnNextHand->setVisible(engine.gameOver && isHostOrSolo);
+    const bool isError = engine.statusMessage.contains(getLocalizedText("Ошибка", "Error")) || engine.statusMessage.contains(getLocalizedText("потеряна", "lost"));
+    btnNextHand->setVisible(engine.gameOver && isHostOrSolo && !isError); // Кнопка "Играть заново" скрыта при ошибке разрыва связи
 
     if (netManager && netManager->isNetworkGame && netManager->isHost) {
         if (activeClients == 0) {
@@ -244,14 +245,22 @@ void UnoWidget::updateUI() {
         lblStatus->setText(engine.statusMessage);
         colorPickerWidget->hide();
     } else {
-        static const QString colNames[] = { getLocalizedText("Красный", "Red"), getLocalizedText("Жёлтый", "Yellow"), getLocalizedText("Зелёный", "Green"), getLocalizedText("Синий", "Blue") };
-        const QString colorTxt = colNames[engine.currentColor];
+        static const QString colNames[] = {
+            getLocalizedText("Красный", "Red"),
+            getLocalizedText("Жёлтый", "Yellow"),
+            getLocalizedText("Зелёный", "Green"),
+            getLocalizedText("Синий", "Blue")
+        };
+        const int safeCol = qBound(0, static_cast<int>(engine.currentColor), 3);
+        const QString colorTxt = colNames[safeCol];
         const QString penaltySuffix = (engine.accumulatedPenalty > 0) ? QString(getLocalizedText(" [ШТРАФ: +%1]", " [PENALTY: +%1]")).arg(engine.accumulatedPenalty) : "";
 
         if (engine.currentTurnIdx == engine.myIdx) {
             lblStatus->setText(QString(getLocalizedText("Ваш ход! Цвет: %1%2", "Your turn! Color: %1%2")).arg(colorTxt, penaltySuffix));
         } else if (engine.currentTurnIdx >= 0 && engine.currentTurnIdx < engine.players.size()) {
             lblStatus->setText(QString(getLocalizedText("Ход игрока %1 (Цвет: %2)%3", "%1's turn (Color: %2)%3")).arg(engine.players[engine.currentTurnIdx].name, colorTxt, penaltySuffix));
+        } else {
+            lblStatus->setText(engine.statusMessage);
         }
     }
 
@@ -735,7 +744,8 @@ void UnoWidget::drawCenterDiscard(QPainter& p, int cardW, int cardH) {
     const QPoint center(width() / 2, height() / 2 - qRound(25 * s));
 
     const QColor arrowColors[] = { QColor(220, 38, 38), QColor(234, 179, 8), QColor(22, 163, 74), QColor(37, 99, 235) };
-    const QColor curCol = arrowColors[engine.currentColor];
+    const int safeCol = qBound(0, static_cast<int>(engine.currentColor), 3); // Защита от UnoWild (4)
+    const QColor curCol = arrowColors[safeCol];
 
     const int arrowRadius = qRound(105 * s);
     p.setPen(QPen(QColor(curCol.red(), curCol.green(), curCol.blue(), 70), qMax(2, qRound(3 * s)), Qt::DashLine));
@@ -778,6 +788,8 @@ void UnoWidget::drawCenterDiscard(QPainter& p, int cardW, int cardH) {
 
 void UnoWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
     const int numPlayers = engine.players.size();
+    if (numPlayers <= 0) return; // Защита от деления на 0
+
     const qreal s = getScale();
     const QVector<QPoint> seatPos = getSeatPositions(numPlayers, width(), height(), qRound(75 * s), qRound(80 * s));
 

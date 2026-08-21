@@ -1,3 +1,5 @@
+#include <QNetworkInterface>
+
 #include "NetworkManager.h"
 #include "AppSettings.h"
 
@@ -8,6 +10,15 @@ NetworkManager::~NetworkManager() {
 }
 
 void NetworkManager::disconnectAll() {
+    stopDiscoveryBroadcast();
+    stopDiscoveryListening();
+
+    // Безопасная остановка и удаление таймера таймаута
+    if (connectionTimeoutTimer) {
+        connectionTimeoutTimer->stop();
+        connectionTimeoutTimer->deleteLater();
+    }
+
     isHost = false;
     isNetworkGame = false;
     isLobby = false;
@@ -16,26 +27,190 @@ void NetworkManager::disconnectAll() {
 
     if (tcpServer) {
         tcpServer->close();
-        delete tcpServer;
+        tcpServer->deleteLater(); // Безопасное отложенное удаление вместо delete
         tcpServer = nullptr;
     }
 
     if (tcpSocket) {
-        tcpSocket->disconnect();
         tcpSocket->abort();
-        tcpSocket->deleteLater();
+        tcpSocket->deleteLater(); // Безопасное отложенное удаление
         tcpSocket = nullptr;
     }
 
     for (auto* s : clientSockets) {
         if (s) {
-            s->disconnect();
             s->abort();
             s->deleteLater();
         }
     }
     clientSockets.clear();
     lobbyClients.clear();
+}
+
+// =============================================================================
+// UDP BROADCAST & LAN DISCOVERY
+// =============================================================================
+
+void NetworkManager::startDiscoveryBroadcast() {
+    stopDiscoveryBroadcast();
+
+    udpBeaconSocket = new QUdpSocket(this);
+    udpBeaconTimer  = new QTimer(this);
+
+    connect(udpBeaconTimer, &QTimer::timeout, this, &NetworkManager::sendDiscoveryBeacon);
+    udpBeaconTimer->start(1000); // Вещание 1 раз в секунду
+    sendDiscoveryBeacon();
+}
+
+void NetworkManager::stopDiscoveryBroadcast() {
+    if (udpBeaconTimer) {
+        udpBeaconTimer->stop();
+        delete udpBeaconTimer;
+        udpBeaconTimer = nullptr;
+    }
+    if (udpBeaconSocket) {
+        udpBeaconSocket->close();
+        delete udpBeaconSocket;
+        udpBeaconSocket = nullptr;
+    }
+}
+
+void NetworkManager::sendDiscoveryBeacon() {
+    if (!udpBeaconSocket || !isHost || !isLobby) return;
+
+    QJsonObject beacon;
+    beacon["tag"]         = "RCC_BEACON";
+    beacon["hostName"]    = AppSettings::instance().getNickname();
+    beacon["gameType"]    = gameType;
+    beacon["playerCount"] = getActiveClientCount() + 1;
+    beacon["maxPlayers"]  = NetConfig::MAX_PLAYERS;
+    beacon["port"]        = AppSettings::instance().getServerPort();
+
+    const QByteArray datagram = QJsonDocument(beacon).toJson(QJsonDocument::Compact);
+
+    // Стандартный общий Broadcast (255.255.255.255)
+    udpBeaconSocket->writeDatagram(datagram, QHostAddress::Broadcast, NetConfig::DISCOVERY_PORT);
+
+    // Точный Broadcast по всем активным Wi-Fi интерфейсам (критично для iOS и macOS)
+    const QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
+    for (const auto& iface : interfaces) {
+        // Проверяем, что интерфейс включен, работает, поддерживает Broadcast и не является локальной петлей (Loopback)
+        if (iface.flags().testFlag(QNetworkInterface::IsUp) && iface.flags().testFlag(QNetworkInterface::IsRunning) && iface.flags().testFlag(QNetworkInterface::CanBroadcast) && !iface.flags().testFlag(QNetworkInterface::IsLoopBack)) {
+
+            for (const auto& entry : iface.addressEntries()) {
+                const QHostAddress bcastAddr = entry.broadcast();
+                // Отправляем на прямой широковещательный адрес подсети (например, 192.168.0.255)
+                if (!bcastAddr.isNull() && bcastAddr != QHostAddress::Broadcast) {
+                    udpBeaconSocket->writeDatagram(datagram, bcastAddr, NetConfig::DISCOVERY_PORT);
+                }
+            }
+        }
+    }
+}
+
+void NetworkManager::startDiscoveryListening() {
+    stopDiscoveryListening();
+
+    discoveredLobbies.clear();
+    udpDiscoverySocket = new QUdpSocket(this);
+
+    // Привязка сокета с флагами совместного использования порта
+    udpDiscoverySocket->bind(QHostAddress::AnyIPv4, NetConfig::DISCOVERY_PORT, QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint);
+    connect(udpDiscoverySocket, &QUdpSocket::readyRead, this, &NetworkManager::onDiscoveryDatagramReceived);
+
+    // Таймер очистки неактивных серверов (не отвечавших более 3.5 секунд)
+    lobbyCleanupTimer = new QTimer(this);
+    connect(lobbyCleanupTimer, &QTimer::timeout, this, &NetworkManager::cleanupStaleLobbies);
+    lobbyCleanupTimer->start(1500);
+}
+
+void NetworkManager::stopDiscoveryListening() {
+    if (lobbyCleanupTimer) {
+        lobbyCleanupTimer->stop();
+        delete lobbyCleanupTimer;
+        lobbyCleanupTimer = nullptr;
+    }
+    if (udpDiscoverySocket) {
+        udpDiscoverySocket->close();
+        delete udpDiscoverySocket;
+        udpDiscoverySocket = nullptr;
+    }
+    discoveredLobbies.clear();
+}
+
+void NetworkManager::onDiscoveryDatagramReceived() {
+    while (udpDiscoverySocket && udpDiscoverySocket->hasPendingDatagrams()) {
+        QByteArray datagram;
+        datagram.resize(int(udpDiscoverySocket->pendingDatagramSize()));
+        QHostAddress senderAddr;
+        quint16 senderPort;
+
+        udpDiscoverySocket->readDatagram(datagram.data(), datagram.size(), &senderAddr, &senderPort);
+
+        const QJsonDocument doc = QJsonDocument::fromJson(datagram);
+        if (!doc.isObject()) continue;
+        const QJsonObject json = doc.object();
+
+        if (json["tag"].toString() != "RCC_BEACON") continue;
+
+        // Преобразование адреса IPv4-mapped IPv6 в стандартный IPv4 вид
+        QString hostIp = senderAddr.toString();
+        if (senderAddr.protocol() == QAbstractSocket::IPv6Protocol) {
+            bool ok = false;
+            const QHostAddress ipv4(senderAddr.toIPv4Address(&ok));
+            if (ok) hostIp = ipv4.toString();
+        }
+
+        const quint16 tcpPort = static_cast<quint16>(json["port"].toInt(12345));
+        const QString hostName = json["hostName"].toString();
+        const int gType = json["gameType"].toInt();
+        const int pCount = json["playerCount"].toInt();
+        const int maxP = json["maxPlayers"].toInt(NetConfig::MAX_PLAYERS);
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+
+        // Поиск и обновление существующего лобби или добавление нового
+        bool found = false;
+        for (auto& lobby : discoveredLobbies) {
+            if (lobby.ip == hostIp && lobby.port == tcpPort) {
+                lobby.hostName    = hostName;
+                lobby.gameType    = gType;
+                lobby.playerCount = pCount;
+                lobby.maxPlayers  = maxP;
+                lobby.lastSeenMs  = now;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            DiscoveredLobby newLobby;
+            newLobby.ip          = hostIp;
+            newLobby.port        = tcpPort;
+            newLobby.hostName    = hostName;
+            newLobby.gameType    = gType;
+            newLobby.playerCount = pCount;
+            newLobby.maxPlayers  = maxP;
+            newLobby.lastSeenMs  = now;
+            discoveredLobbies.append(newLobby);
+        }
+
+        emit lobbiesUpdated(discoveredLobbies);
+    }
+}
+
+void NetworkManager::cleanupStaleLobbies() {
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    const int initialSize = discoveredLobbies.size();
+
+    for (int i = discoveredLobbies.size() - 1; i >= 0; --i) {
+        if (now - discoveredLobbies[i].lastSeenMs > 3500) {
+            discoveredLobbies.removeAt(i);
+        }
+    }
+
+    if (discoveredLobbies.size() != initialSize) {
+        emit lobbiesUpdated(discoveredLobbies);
+    }
 }
 
 int NetworkManager::getActiveClientCount() const {
@@ -117,23 +292,36 @@ void NetworkManager::startHostServer(int selectedGameType) {
 
     if (!tcpServer->listen(QHostAddress::Any, AppSettings::instance().getServerPort())) {
         emit lobbyStatusChanged(getLocalizedText("Ошибка: не удалось запустить сервер!", "Error: Failed to start server!"));
+    } else {
+        startDiscoveryBroadcast(); // Запуск периодического вещания маяков в сеть
     }
 }
-
-void NetworkManager::connectToHost(const QString& ip, int mySelectedGameType) {
+void NetworkManager::connectToHost(const QString& ip, int mySelectedGameType, quint16 port) {
     disconnectAll();
     isHost = false;
     isNetworkGame = true;
     isLobby = true;
     myIdx = 1;
     selectedClientGameType = mySelectedGameType;
+    isSessionActive = false;
+
+    const quint16 targetPort = (port != 0) ? port : AppSettings::instance().getServerPort();
+
+    emit lobbyStatusChanged(getLocalizedText("Подключение к серверу...", "Connecting to server..."));
 
     tcpSocket = new QTcpSocket(this);
     connect(tcpSocket, &QTcpSocket::readyRead, this, &NetworkManager::onNetworkReadClient);
 
-    isSessionActive = false;
+    // Создаем таймер через QPointer
+    connectionTimeoutTimer = new QTimer(this);
+    connectionTimeoutTimer->setSingleShot(true);
 
     connect(tcpSocket, &QTcpSocket::connected, this, [this]() {
+        if (connectionTimeoutTimer) {
+            connectionTimeoutTimer->stop();
+            connectionTimeoutTimer->deleteLater();
+        }
+
         emit lobbyStatusChanged(getLocalizedText("Подключено! Ожидание лобби...", "Connected! Waiting for lobby..."));
 
         QJsonObject joinJson;
@@ -144,14 +332,17 @@ void NetworkManager::connectToHost(const QString& ip, int mySelectedGameType) {
     });
 
     auto handleDisconnect = [this]() {
-        if (!isNetworkGame || isHost) return;
+        if (connectionTimeoutTimer) {
+            connectionTimeoutTimer->stop();
+            connectionTimeoutTimer->deleteLater();
+        }
+
+        // Если разрыв уже был обработан - выходим
+        if (!isNetworkGame && !tcpSocket) return;
 
         const bool wasInSession = isSessionActive;
-        const QString msg = wasInSession
-        ? getLocalizedText("Связь с сервером потеряна! Хост отключился.", "Connection lost! Host disconnected.")
-        : getLocalizedText("Ошибка: Сервер не найден или лобби не существует!", "Error: Server not found or lobby does not exist!");
+        const QString msg = wasInSession ? getLocalizedText("Связь с сервером потеряна! Хост отключился.", "Connection lost! Host disconnected.") : getLocalizedText("Ошибка: Сервер не найден или лобби не существует!", "Error: Server not found or lobby does not exist!");
 
-        isLobby = false;
         disconnectAll();
         emit lobbyStatusChanged(msg);
         if (wasInSession) {
@@ -159,15 +350,22 @@ void NetworkManager::connectToHost(const QString& ip, int mySelectedGameType) {
         }
     };
 
+    connect(connectionTimeoutTimer.data(), &QTimer::timeout, this, [this, handleDisconnect]() {
+        if (tcpSocket && tcpSocket->state() != QAbstractSocket::ConnectedState) {
+            handleDisconnect();
+        }
+    });
+
     connect(tcpSocket, &QAbstractSocket::errorOccurred, this, [handleDisconnect](QAbstractSocket::SocketError) {
         handleDisconnect();
-    });
+    }, Qt::QueuedConnection);
 
     connect(tcpSocket, &QTcpSocket::disconnected, this, [handleDisconnect]() {
         handleDisconnect();
-    });
+    }, Qt::QueuedConnection);
 
-    tcpSocket->connectToHost(ip, AppSettings::instance().getServerPort());
+    connectionTimeoutTimer->start(5000);
+    tcpSocket->connectToHost(ip, targetPort);
 }
 
 void NetworkManager::broadcastJson(const QJsonObject& json) {
@@ -211,15 +409,8 @@ void NetworkManager::onNetworkReadHost() {
             const int cAvatar = json["avatar"].toInt(0);
             if (cName.isEmpty()) cName = getLocalizedText("Игрок", "Player");
 
-            int existingIdx = -1;
-            for (int i = 0; i < lobbyClients.size(); ++i) {
-                if (lobbyClients[i].name == cName) {
-                    existingIdx = i;
-                    break;
-                }
-            }
-
-            if (existingIdx == 0 || (existingIdx != -1 && (isLobby || !lobbyClients[existingIdx].isDisconnected))) {
+            // Проверяем совпадение с именем хоста
+            if (!lobbyClients.isEmpty() && lobbyClients[0].name == cName) {
                 QJsonObject errJson;
                 errJson["error"] = true;
                 errJson["message"] = getLocalizedText("Ошибка: Игрок с таким именем уже в лобби!", "Error: Player with this name is already in lobby!");
@@ -229,13 +420,39 @@ void NetworkManager::onNetworkReadHost() {
                 return;
             }
 
+            // Ищем существующего участника с таким же ником
+            int existingIdx = -1;
+            for (int i = 1; i < lobbyClients.size(); ++i) {
+                if (lobbyClients[i].name == cName) {
+                    existingIdx = i;
+                    break;
+                }
+            }
+
+            // Отклоняем только если игрок с таким именем УЖЕ АКТИВЕН И ПОДКЛЮЧЕН в данный момент
+            if (existingIdx != -1 && !lobbyClients[existingIdx].isDisconnected) {
+                QJsonObject errJson;
+                errJson["error"] = true;
+                errJson["message"] = getLocalizedText("Ошибка: Игрок с таким именем уже в лобби!", "Error: Player with this name is already in lobby!");
+                senderSocket->write(QJsonDocument(errJson).toJson(QJsonDocument::Compact) + "\n");
+                senderSocket->flush();
+                senderSocket->disconnectFromHost();
+                return;
+            }
+
+            // Если мы находимся в лобби, а в списке осталась старая отключенная запись - очищаем её
+            if (isLobby && existingIdx != -1 && lobbyClients[existingIdx].isDisconnected) {
+                lobbyClients.removeAt(existingIdx);
+                existingIdx = -1;
+            }
+
+            // Подключение / переподключение игрока
             if (existingIdx > 0) {
                 const int socketSlot = existingIdx - 1;
                 if (socketSlot < clientSockets.size()) {
                     auto* oldSocket = clientSockets[socketSlot];
                     if (oldSocket && oldSocket != senderSocket) {
                         oldSocket->abort();
-                        oldSocket->disconnect();
                         oldSocket->deleteLater();
                     }
                     clientSockets[socketSlot] = senderSocket;

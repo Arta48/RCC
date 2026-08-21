@@ -142,6 +142,12 @@ MainMenuWidget::MainMenuWidget(QWidget* parent) : QWidget(parent) {
     "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563EB, stop:1 #60A5FA); }");
     btnHostServer->setCursor(Qt::PointingHandCursor);
 
+    // Кнопка автопоиска в сети
+    btnScanLan = new QPushButton(getLocalizedText("Найти серверы в LAN", "Scan LAN Servers"), netFrame);
+    btnScanLan->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0D9488, stop:1 #14B8A6); color: white; font-weight: bold; border-radius: 8px; border: none; } "
+    "QPushButton:hover { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0F766E, stop:1 #2DD4BF); }");
+    btnScanLan->setCursor(Qt::PointingHandCursor);
+
     auto* connectLayout = new QHBoxLayout();
     ipInput = new QLineEdit(netFrame);
     ipInput->setPlaceholderText("127.0.0.1");
@@ -162,6 +168,7 @@ MainMenuWidget::MainMenuWidget(QWidget* parent) : QWidget(parent) {
 
     netLayout->addWidget(lblMultiHeader);
     netLayout->addWidget(btnHostServer);
+    netLayout->addWidget(btnScanLan);
     netLayout->addLayout(connectLayout);
 
     btnSettings = new QPushButton(getLocalizedText("Настройки", "Settings"), container);
@@ -227,6 +234,8 @@ void MainMenuWidget::resizeEvent(QResizeEvent* ev) {
     btnStartBotGame->setFont(fNorm);
     btnHostServer->setFixedHeight(itemH);
     btnHostServer->setFont(fNorm);
+    btnScanLan->setFixedHeight(itemH);
+    btnScanLan->setFont(fNorm);
     ipInput->setFixedHeight(itemH);
     ipInput->setFont(fNorm);
     btnConnectIP->setFixedHeight(itemH);

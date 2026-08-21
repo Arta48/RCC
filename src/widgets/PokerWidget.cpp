@@ -37,6 +37,13 @@ PokerWidget::PokerWidget(NetworkManager* netMgr, QWidget* parent)
             }
         }
         lblRaiseAmount->setText(QString("$%1").arg(val));
+
+        // Динамическая смена надписи: на максималке пишем ALL IN, в остальных случаях RAISE
+        if (val >= raiseSlider->maximum()) {
+            btnRaise->setText(getLocalizedText("ALL IN", "ALL IN"));
+        } else {
+            btnRaise->setText(getLocalizedText("RAISE", "RAISE"));
+        }
     });
 
     connect(btnFold, &QPushButton::clicked, this, [this](){ onPlayerAction("FOLD"); });
@@ -89,6 +96,13 @@ PokerWidget::PokerWidget(NetworkManager* netMgr, QWidget* parent)
                     engine.communityCards.clear();
                     engine.pot = 0;
 
+                    // Очищаем сокеты и оставляем в лобби только хоста
+                    netManager->clientSockets.clear();
+                    if (!netManager->lobbyClients.isEmpty()) {
+                        netManager->lobbyClients.resize(1);
+                        netManager->lobbyClients[0].isDisconnected = false;
+                    }
+
                     engine.statusMessage = QString(getLocalizedText("ЛОББИ: 1/%1 игроков. Ожидание...", "LOBBY: 1/%1 players. Waiting...")).arg(NetConfig::MAX_PLAYERS);
                     lblStatus->setText(engine.statusMessage);
                     broadcastNetState();
@@ -132,6 +146,10 @@ PokerWidget::PokerWidget(NetworkManager* netMgr, QWidget* parent)
             if (msg.contains(getLocalizedText("Ошибка", "Error")) || msg.contains(getLocalizedText("потеряна", "lost"))) {
                 engine.gameOver = true;
                 engine.statusMessage = msg;
+            } else {
+                // Сбрасываем флаг ошибки и баннер при успешном статусе лобби
+                engine.gameOver = false;
+                engine.statusMessage.clear();
             }
 
             updateUI();
@@ -166,8 +184,6 @@ void PokerWidget::startSingleGame(int botCount) {
 
 void PokerWidget::processNetAction(int senderId, const QJsonObject& json) {
     if (!netManager || !netManager->isHost) return;
-
-    // Валидация подключенного участника
     if (senderId < 0 || senderId >= NetConfig::MAX_PLAYERS) return;
 
     if (senderId >= engine.players.size()) {
@@ -189,7 +205,7 @@ void PokerWidget::processNetAction(int senderId, const QJsonObject& json) {
         return;
     }
 
-    // Валидация действий: ход строго в свою очередь
+    // Валидация очереди хода
     if (senderId != engine.currentTurnIdx || engine.gameOver) return;
 
     static const QStringList validActions = { "FOLD", "CALL", "RAISE", "CHECK" };
@@ -200,12 +216,15 @@ void PokerWidget::processNetAction(int senderId, const QJsonObject& json) {
 
     if (act == "RAISE") {
         const int maxR = p.balance + p.currentBet;
-        const int minR = engine.currentHighestBet + engine.minRaise;
+        int minR = engine.currentHighestBet + engine.minRaise;
+        // Если стек игрока меньше минимального рейза, олл-ин разрешен на весь стек
+        if (minR > maxR) minR = maxR;
         amt = qBound(minR, amt, maxR);
     }
 
     engine.processAction(senderId, act, amt);
     broadcastNetState();
+    updateUI(); // Мгновенно обновляем интерфейс хоста
 }
 
 void PokerWidget::broadcastNetState() {
@@ -264,46 +283,30 @@ void PokerWidget::updateUI() {
     lblRaiseAmount->setVisible(isMyTurn);
 
     const int activeClients = netManager ? netManager->getActiveClientCount() : 0;
+    const bool isHostOrSolo = (!netManager || !netManager->isNetworkGame || (netManager->isHost && !isLobby));
+    const bool isError = engine.statusMessage.contains(getLocalizedText("Ошибка", "Error")) ||
+    engine.statusMessage.contains(getLocalizedText("потеряна", "lost"));
+
     btnStartNetGame->setVisible(netManager && netManager->isHost && isLobby && activeClients >= 1);
 
-    const bool isError = engine.statusMessage.contains(getLocalizedText("Ошибка", "Error")) || engine.statusMessage.contains(getLocalizedText("потеряна", "lost"));
-
-    bool canShowNextHand = false;
-    if (!isError && engine.gameOver) {
-        if (netManager && netManager->isNetworkGame) {
-            if (netManager->isHost && !netManager->isLobby) {
-                canShowNextHand = true;
-            }
-        } else {
-            if (engine.players.size() >= 2) {
-                canShowNextHand = true;
-            }
-        }
-    }
-
+    const bool canShowNextHand = engine.gameOver && isHostOrSolo && !isError;
     btnNextHand->setVisible(canShowNextHand);
 
     if (canShowNextHand) {
-        if (netManager && netManager->isNetworkGame && netManager->isHost) {
-            if (activeClients == 0) {
-                btnNextHand->setText(getLocalizedText("ВЕРНУТЬСЯ В ЛОББИ", "RETURN TO LOBBY"));
-            } else if (engine.countSolventPlayers() < 2) {
-                btnNextHand->setText(getLocalizedText("ИГРАТЬ ЗАНОВО", "PLAY AGAIN"));
-            } else {
-                btnNextHand->setText(getLocalizedText("СЛЕДУЮЩАЯ РАЗДАЧА", "NEXT HAND"));
-                if (!autoNextHandTimer->isActive() && AppSettings::instance().getAutoNextHand()) {
-                    autoNextHandTimer->start(3000);
-                }
-            }
+        const bool isNetworkHost = (netManager && netManager->isNetworkGame && netManager->isHost);
+        const bool isSoloBankrupt = (!isNetworkHost && engine.myIdx < engine.players.size() && engine.players[engine.myIdx].balance <= 0);
+        const bool needsFullReset = isSoloBankrupt || (engine.countSolventPlayers() < 2);
+
+        if (isNetworkHost && activeClients == 0) {
+            btnNextHand->setText(getLocalizedText("ВЕРНУТЬСЯ В ЛОББИ", "RETURN TO LOBBY"));
+            autoNextHandTimer->stop();
+        } else if (needsFullReset) {
+            btnNextHand->setText(getLocalizedText("ИГРАТЬ ЗАНОВО", "PLAY AGAIN"));
+            autoNextHandTimer->stop();
         } else {
-            const bool isSoloHumanBankrupt = (engine.myIdx < engine.players.size() && engine.players[engine.myIdx].balance <= 0);
-            if (isSoloHumanBankrupt || engine.countSolventPlayers() < 2) {
-                btnNextHand->setText(getLocalizedText("ИГРАТЬ ЗАНОВО", "PLAY AGAIN"));
-            } else {
-                btnNextHand->setText(getLocalizedText("СЛЕДУЮЩАЯ РАЗДАЧА", "NEXT HAND"));
-                if (!autoNextHandTimer->isActive() && AppSettings::instance().getAutoNextHand()) {
-                    autoNextHandTimer->start(3000);
-                }
+            btnNextHand->setText(getLocalizedText("СЛЕДУЮЩАЯ РАЗДАЧА", "NEXT HAND"));
+            if (!autoNextHandTimer->isActive() && AppSettings::instance().getAutoNextHand()) {
+                autoNextHandTimer->start(3000);
             }
         }
     } else {
@@ -313,25 +316,44 @@ void PokerWidget::updateUI() {
     if (isMyTurn && engine.myIdx < engine.players.size()) {
         const Player& p = engine.players[engine.myIdx];
         const int toCall = engine.currentHighestBet - p.currentBet;
+        const int actualCallAmount = std::min(toCall, p.balance);
 
-        if (toCall == 0) btnCall->setText(getLocalizedText("CHECK", "CHECK"));
-        else btnCall->setText(QString(getLocalizedText("CALL $%1", "CALL $%1")).arg(toCall));
+        // Центральная кнопка: CHECK или CALL
+        if (toCall == 0) {
+            btnCall->setText(getLocalizedText("CHECK", "CHECK"));
+        } else {
+            btnCall->setText(QString(getLocalizedText("CALL $%1", "CALL $%1")).arg(actualCallAmount));
+        }
 
-        int minR = engine.currentHighestBet + engine.minRaise;
-        if (minR > p.balance + p.currentBet) minR = p.balance + p.currentBet;
-        const int maxR = p.balance + p.currentBet;
-
-        if (minR >= maxR) {
+        // Правая кнопка (RAISE / ALL IN) и слайдер:
+        // Если для колла требуется весь наш стек или больше — рейзить нечем, скрываем кнопку рейза!
+        if (toCall >= p.balance) {
+            btnRaise->setVisible(false);
             raiseSlider->setVisible(false);
             lblRaiseAmount->setVisible(false);
-            btnRaise->setText(getLocalizedText("ALL IN", "ALL IN"));
         } else {
-            raiseSlider->setRange(minR, maxR);
-            raiseSlider->setSingleStep(10);
-            raiseSlider->setPageStep(10);
-            raiseSlider->setValue(minR);
-            lblRaiseAmount->setText(QString("$%1").arg(minR));
-            btnRaise->setText(getLocalizedText("RAISE", "RAISE"));
+            btnRaise->setVisible(true);
+
+            int minR = engine.currentHighestBet + engine.minRaise;
+            if (minR > p.balance + p.currentBet) minR = p.balance + p.currentBet;
+            const int maxR = p.balance + p.currentBet;
+
+            if (minR >= maxR) {
+                // Стека хватает на колл, но не хватает на полный мин-рейз -> доступен только пуш ALL IN
+                raiseSlider->setVisible(false);
+                lblRaiseAmount->setVisible(false);
+                btnRaise->setText(getLocalizedText("ALL IN", "ALL IN"));
+            } else {
+                // Полноценный выбор суммы рейза через слайдер
+                raiseSlider->setVisible(true);
+                lblRaiseAmount->setVisible(true);
+                raiseSlider->setRange(minR, maxR);
+                raiseSlider->setSingleStep(10);
+                raiseSlider->setPageStep(10);
+                raiseSlider->setValue(minR);
+                lblRaiseAmount->setText(QString("$%1").arg(minR));
+                btnRaise->setText(getLocalizedText("RAISE", "RAISE"));
+            }
         }
     }
 
@@ -423,8 +445,9 @@ void PokerWidget::paintEvent(QPaintEvent*) {
 
 void PokerWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
     const int numPlayers = engine.players.size();
-    const qreal s = getScale();
+    if (numPlayers <= 0) return; // Защита от деления на 0
 
+    const qreal s = getScale();
     const int bottomOffset = qRound(115 * s);
     const int topOffset = qRound(80 * s);
     const QVector<QPoint> seatPos = getSeatPositions(numPlayers, width(), height(), bottomOffset, topOffset);

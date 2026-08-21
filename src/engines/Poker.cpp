@@ -342,16 +342,19 @@ void PokerEngine::processAction(int pIdx, const QString& action, int raiseTotal)
 }
 
 void PokerEngine::checkPhaseAdvance() {
+    // 1. Проверяем, уравняли ли все активные (не сбросившие и не All-In) игроки текущую ставку
     bool allMatched = true;
     for (const auto& p : players) {
-        if (!p.hasFolded && !p.isAllIn && p.currentBet < currentHighestBet) allMatched = false;
+        if (!p.hasFolded && !p.isAllIn && p.currentBet < currentHighestBet) {
+            allMatched = false;
+            break;
+        }
     }
 
-    if ((allMatched && playersActed >= countActivePlayers()) || countNonAllInPlayers() <= 1) {
-        for (const auto& p : players) {
-            if (!p.hasFolded && !p.isAllIn && p.currentBet < currentHighestBet) return;
-        }
+    // 2. Фаза завершается если ставки уравнены и либо все сделали ход, либо все игроки (кроме максимум одного) уже в All-In
+    const bool canAdvancePhase = allMatched && (playersActed >= countActivePlayers() || countNonAllInPlayers() <= 1);
 
+    if (canAdvancePhase) {
         for (auto& p : players) p.currentBet = 0;
         currentHighestBet = 0;
         minRaise = bigBlind;
@@ -375,14 +378,18 @@ void PokerEngine::checkPhaseAdvance() {
             return;
         }
 
+        // Если после перехода фазы все игроки уже в All-In, сразу открываем оставшиеся карты стола
         if (countNonAllInPlayers() <= 1) {
             while (communityCards.size() < 5) communityCards.append(deck.takeFirst());
             phase = SHOWDOWN;
             resolveShowdown();
             return;
         }
+
         currentTurnIdx = getNextActivePlayer(dealerIdx);
     }
+
+    // Всегда обновляем статус и отправляем сигнал обновления интерфейса!
     updateStatus();
     emit stateChanged();
 }

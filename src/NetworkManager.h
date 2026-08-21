@@ -5,13 +5,31 @@
 #include <QVector>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QUdpSocket>
+#include <QTimer>
+#include <QPointer>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QDateTime>
 
 namespace NetConfig {
     constexpr int MAX_PLAYERS = 4;
     constexpr int MAX_CLIENTS = MAX_PLAYERS - 1;
+    constexpr quint16 DISCOVERY_PORT = 12346; // Порт UDP-рассылки маяков
 }
+
+/**
+ * @brief Информация об обнаруженной в локальной сети игровой комнате.
+ */
+struct DiscoveredLobby {
+    QString  ip;
+    quint16  port = 12345;
+    QString  hostName;
+    int      gameType = 0;
+    int      playerCount = 1;
+    int      maxPlayers = NetConfig::MAX_PLAYERS;
+    qint64   lastSeenMs = 0;
+};
 
 /**
  * @brief Метаданные подключенного клиента в лобби.
@@ -47,9 +65,25 @@ public:
     QVector<QTcpSocket*>     clientSockets;
     QVector<ConnectedClient> lobbyClients;
 
+    // --- UDP Discovery ---
+    QUdpSocket*              udpBeaconSocket    = nullptr;
+    QUdpSocket*              udpDiscoverySocket = nullptr;
+    QTimer*                  udpBeaconTimer     = nullptr;
+    QTimer*                  lobbyCleanupTimer  = nullptr;
+    QVector<DiscoveredLobby> discoveredLobbies;
+
+    // --- Таймер таймаута подключения (безопасный QPointer) ---
+    QPointer<QTimer>         connectionTimeoutTimer;
+
     void startHostServer(int selectedGameType);
-    void connectToHost(const QString& ip, int mySelectedGameType);
+    void connectToHost(const QString& ip, int mySelectedGameType, quint16 port = 0);
     void disconnectAll();
+
+    // --- Управление поиском в локальной сети ---
+    void startDiscoveryBroadcast();
+    void stopDiscoveryBroadcast();
+    void startDiscoveryListening();
+    void stopDiscoveryListening();
 
     void broadcastJson(const QJsonObject& json);
     void sendJsonToClient(int clientIdx, const QJsonObject& json);
@@ -65,8 +99,12 @@ signals:
     void signalPlayerReconnected(int pIdx);
     void signalPlayerDisconnected(int pIdx);
     void signalNetworkDataReceived(int senderId, const QJsonObject& json);
+    void lobbiesUpdated(const QVector<DiscoveredLobby>& lobbies); // Сигнал обновления найденных лобби
 
 private slots:
     void onNetworkReadHost();
     void onNetworkReadClient();
+    void sendDiscoveryBeacon();
+    void onDiscoveryDatagramReceived();
+    void cleanupStaleLobbies();
 };

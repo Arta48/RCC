@@ -91,7 +91,8 @@ void DurakWidget::updateUI() {
     bool allDefended = true;
     int undefendedCount = 0;
 
-    if (!engine.table.isEmpty()) {
+    // Безопасная проверка: стол и список игроков не должны быть пустыми
+    if (!engine.table.isEmpty() && !engine.players.isEmpty()) {
         for (const auto& pair : engine.table) {
             if (!pair.isDefended) {
                 allDefended = false;
@@ -99,16 +100,21 @@ void DurakWidget::updateUI() {
             }
         }
 
-        const int defenderCardsCount = engine.players[engine.defenderIdx].hand.size();
+        // Безопасное получение карт защитника
+        int defenderCardsCount = 0;
+        if (engine.defenderIdx >= 0 && engine.defenderIdx < engine.players.size()) {
+            defenderCardsCount = engine.players[engine.defenderIdx].hand.size();
+        }
         const bool limitReached = (undefendedCount >= defenderCardsCount || engine.table.size() >= 6);
+        const bool hasMyCards = (engine.myIdx >= 0 && engine.myIdx < engine.players.size() && !engine.players[engine.myIdx].hand.isEmpty());
 
         if (engine.isDefenderTaking) {
-            if (!limitReached && !engine.players[engine.myIdx].hand.isEmpty() &&
+            if (!limitReached && hasMyCards &&
                 (engine.attackerIdx == engine.myIdx || engine.currentTurnIdx == engine.myIdx)) {
                 canPressBito = true;
                 }
         } else {
-            if (allDefended && engine.attackerIdx == engine.myIdx && !engine.players[engine.myIdx].hand.isEmpty()) {
+            if (allDefended && engine.attackerIdx == engine.myIdx && hasMyCards) {
                 canPressBito = true;
             }
             if (!allDefended && engine.defenderIdx == engine.myIdx) {
@@ -119,10 +125,11 @@ void DurakWidget::updateUI() {
 
     const int activeClients = netManager ? netManager->getActiveClientCount() : 0;
     const bool isHostOrSolo = (!netManager || !netManager->isNetworkGame || netManager->isHost);
+    const bool isError = engine.statusMessage.contains(getLocalizedText("Ошибка", "Error")) || engine.statusMessage.contains(getLocalizedText("потеряна", "lost"));
 
     btnPass->setVisible(canPressBito && !engine.gameOver);
     btnTake->setVisible(canPressTake && !engine.gameOver);
-    btnNextHand->setVisible(engine.gameOver && isHostOrSolo);
+    btnNextHand->setVisible(engine.gameOver && isHostOrSolo && !isError); // Кнопка "Играть заново" скрыта при ошибке разрыва связи
 
     if (netManager && netManager->isNetworkGame && netManager->isHost) {
         if (activeClients == 0) {
@@ -136,42 +143,51 @@ void DurakWidget::updateUI() {
 
     if (engine.gameOver) {
         lblStatus->setText(engine.statusMessage);
-    } else if (engine.myIdx < engine.players.size() && engine.players[engine.myIdx].isOut && !engine.deck.isEmpty()) {
+    } else if (engine.myIdx >= 0 && engine.myIdx < engine.players.size() && engine.players[engine.myIdx].isOut && !engine.deck.isEmpty()) {
         lblStatus->setText(getLocalizedText("Вы зашли во время игры. Ожидание следующего раунда...", "You joined mid-game. Waiting for next round..."));
     } else if (engine.isDefenderTaking) {
         if (engine.defenderIdx == engine.myIdx) {
             lblStatus->setText(getLocalizedText("Вы берёте карты! Ожидание завершения хода...", "You take cards! Waiting for turn to finish..."));
-        } else if (engine.players[engine.myIdx].hand.isEmpty()) {
-            lblStatus->setText(QString(getLocalizedText("%1 берёт карты!", "%1 takes cards!")).arg(engine.players[engine.defenderIdx].name));
+        } else if (engine.myIdx >= 0 && engine.myIdx < engine.players.size() && engine.players[engine.myIdx].hand.isEmpty()) {
+            const QString defName = (engine.defenderIdx >= 0 && engine.defenderIdx < engine.players.size()) ? engine.players[engine.defenderIdx].name : "";
+            lblStatus->setText(QString(getLocalizedText("%1 берёт карты!", "%1 takes cards!")).arg(defName));
         } else if (engine.attackerIdx == engine.myIdx || engine.currentTurnIdx == engine.myIdx) {
-            lblStatus->setText(QString(getLocalizedText("%1 берёт карты! Подкиньте или нажмите Пас", "%1 takes cards! Toss cards or press Pass")).arg(engine.players[engine.defenderIdx].name));
+            const QString defName = (engine.defenderIdx >= 0 && engine.defenderIdx < engine.players.size()) ? engine.players[engine.defenderIdx].name : "";
+            lblStatus->setText(QString(getLocalizedText("%1 берёт карты! Подкиньте или нажмите Пас", "%1 takes cards! Toss cards or press Pass")).arg(defName));
         } else {
-            lblStatus->setText(QString(getLocalizedText("%1 берёт карты!", "%1 takes cards!")).arg(engine.players[engine.defenderIdx].name));
+            const QString defName = (engine.defenderIdx >= 0 && engine.defenderIdx < engine.players.size()) ? engine.players[engine.defenderIdx].name : "";
+            lblStatus->setText(QString(getLocalizedText("%1 берёт карты!", "%1 takes cards!")).arg(defName));
         }
     } else if (engine.table.isEmpty()) {
         if (engine.attackerIdx == engine.myIdx) {
             lblStatus->setText(getLocalizedText("Ваш ход! Атакуйте!", "Your turn! Attack!"));
         } else if (engine.defenderIdx == engine.myIdx) {
-            lblStatus->setText(QString(getLocalizedText("Ожидание атаки от игрока %1...", "Waiting for %1 to attack...")).arg(engine.players[engine.attackerIdx].name));
+            const QString atkName = (engine.attackerIdx >= 0 && engine.attackerIdx < engine.players.size()) ? engine.players[engine.attackerIdx].name : "";
+            lblStatus->setText(QString(getLocalizedText("Ожидание атаки от игрока %1...", "Waiting for %1 to attack...")).arg(atkName));
         } else {
-            lblStatus->setText(QString(getLocalizedText("Ход игрока %1", "%1's turn")).arg(engine.players[engine.attackerIdx].name));
+            const QString atkName = (engine.attackerIdx >= 0 && engine.attackerIdx < engine.players.size()) ? engine.players[engine.attackerIdx].name : "";
+            lblStatus->setText(QString(getLocalizedText("Ход игрока %1", "%1's turn")).arg(atkName));
         }
     } else {
         if (!allDefended) {
             if (engine.defenderIdx == engine.myIdx) {
                 lblStatus->setText(getLocalizedText("Ваш ход! Защищайтесь!", "Your turn! Defend!"));
             } else if (engine.attackerIdx == engine.myIdx) {
-                lblStatus->setText(QString(getLocalizedText("Ожидание защиты от игрока %1...", "Waiting for %1 to defend...")).arg(engine.players[engine.defenderIdx].name));
+                const QString defName = (engine.defenderIdx >= 0 && engine.defenderIdx < engine.players.size()) ? engine.players[engine.defenderIdx].name : "";
+                lblStatus->setText(QString(getLocalizedText("Ожидание защиты от игрока %1...", "Waiting for %1 to defend...")).arg(defName));
             } else {
-                lblStatus->setText(QString(getLocalizedText("%1 защищается...", "%1 is defending...")).arg(engine.players[engine.defenderIdx].name));
+                const QString defName = (engine.defenderIdx >= 0 && engine.defenderIdx < engine.players.size()) ? engine.players[engine.defenderIdx].name : "";
+                lblStatus->setText(QString(getLocalizedText("%1 защищается...", "%1 is defending...")).arg(defName));
             }
         } else {
             if (engine.attackerIdx == engine.myIdx) {
                 lblStatus->setText(getLocalizedText("Все карты отбиты! Подкиньте или нажмите Бито", "All cards beaten! Toss cards or press Done"));
             } else if (engine.defenderIdx == engine.myIdx) {
-                lblStatus->setText(QString(getLocalizedText("Ожидание хода %1 (подкинет или Бито)...", "Waiting for %1 (toss or Done)...")).arg(engine.players[engine.attackerIdx].name));
+                const QString atkName = (engine.attackerIdx >= 0 && engine.attackerIdx < engine.players.size()) ? engine.players[engine.attackerIdx].name : "";
+                lblStatus->setText(QString(getLocalizedText("Ожидание хода %1 (подкинет или Бито)...", "Waiting for %1 (toss or Done)...")).arg(atkName));
             } else {
-                lblStatus->setText(QString(getLocalizedText("%1 подкидывает или Бито...", "%1 is tossing or Done...")).arg(engine.players[engine.attackerIdx].name));
+                const QString atkName = (engine.attackerIdx >= 0 && engine.attackerIdx < engine.players.size()) ? engine.players[engine.attackerIdx].name : "";
+                lblStatus->setText(QString(getLocalizedText("%1 подкидывает или Бито...", "%1 is tossing or Done...")).arg(atkName));
             }
         }
     }
@@ -441,6 +457,8 @@ void DurakWidget::paintEvent(QPaintEvent*) {
 
 void DurakWidget::drawPlayers(QPainter& p, int cardW, int cardH) {
     const int numPlayers = engine.players.size();
+    if (numPlayers <= 0) return; // Защита от деления на 0
+
     const qreal s = getScale();
     const QVector<QPoint> seatPos = getSeatPositions(numPlayers, width(), height(), qRound(75 * s), qRound(80 * s));
 
